@@ -52,9 +52,36 @@ const GROCERY_AISLES: Record<string, Set<string>> = {
   ]),
 }
 
+// MAKEUP, PERFUME AND NAILS are carved out of personal care (2026-09-27):
+// shampoo and toothpaste are a shopping list, lipstick is not. Deodorants are
+// safe to lose from `deodorante-si-parfumuri` because every one of them is also
+// shown under ingrijire-personala/deodorante-si-antiperspirante.
+const CARVED_OUT = [
+  'cosmetice-si-ingrijire-personala/produse-machiaj-accesorii',
+  'cosmetice-si-ingrijire-personala/parfumuri',
+  'cosmetice-si-ingrijire-personala/deodorante-si-parfumuri',
+  'cosmetice-si-ingrijire-personala/gama-produse-lux',
+  'cosmetice-si-ingrijire-personala/pachete-cosmetice',
+  'cosmetice-si-ingrijire-personala/ingrijire-personala/ingrijirea-unghiilor',
+  'cosmetice-si-ingrijire-personala/ingrijire-personala/aparate-cosmetice',
+]
+
+const pathOf = (department: string): string => new URL(department).pathname.split('/').filter(Boolean).join('/')
+
+/** A department cut out of a grocery one: what it shows is removed, not imported. */
+export function carrefourDepartmentIsCarvedOut(department: string): boolean {
+  const path = pathOf(department)
+  return CARVED_OUT.some((carved) => path === carved || path.startsWith(`${carved}/`))
+}
+
 export function carrefourDepartmentIsGrocery(department: string): boolean {
   const [root, aisle] = new URL(department).pathname.split('/').filter(Boolean)
   if (!root) return false
+  if (carrefourDepartmentIsCarvedOut(department)) return false
+  // A parent's pages hold what its leaves do, so the cosmetics department's own
+  // page would bring the lipsticks back in. Its grocery leaves are read instead.
+  const path = pathOf(department)
+  if (CARVED_OUT.some((carved) => carved.startsWith(`${path}/`))) return false
   if (GROCERY_DEPARTMENTS.has(root)) return true
   return aisle !== undefined && (GROCERY_AISLES[root]?.has(aisle) ?? false)
 }

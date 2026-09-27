@@ -29,7 +29,7 @@ import type { RetailerProduct, RetailerScraper, ScrapeContext, Market, Category 
 import { HttpClient } from '../../core/http.ts'
 import { fetchRobots, isAllowed } from '../../core/robots.ts'
 import { collectSitemapEntries } from '../../core/pageCrawl.ts'
-import { crawlDepartments, carrefourDepartmentIsGrocery } from './departments.ts'
+import { crawlDepartments, carrefourDepartmentIsGrocery, carrefourDepartmentIsCarvedOut } from './departments.ts'
 import { isAvailable } from '../../core/jsonld.ts'
 import type { JsonLdProduct } from '../../core/jsonld.ts'
 import { parseQuantity, validGtin, httpsUrl, usableBrand } from '../../core/normalize.ts'
@@ -311,7 +311,13 @@ export class CarrefourScraper implements RetailerScraper {
       // of that kind can come back: a run only imports what a grocery department
       // shows. Reading them every night found nothing new and cost the job its
       // five hours, so every Carrefour run ended killed and red.
-      if (ctx.groceriesOnly) return
+      //
+      // Except the aisles carved out of personal care (makeup, perfume, nails):
+      // those were imported as groceries until 2026-09-27, and a few dozen
+      // departments a night is what removes them. Positive evidence, same as
+      // the rest: a product the groceries also showed is in `kept` and stays.
+      const outside = ctx.groceriesOnly ? others.filter(carrefourDepartmentIsCarvedOut) : others
+      if (outside.length === 0) return
 
       // A department failing from here on still stops the run concluding
       // anything from ABSENCE. It does not stop this: what a clothing department
@@ -319,7 +325,7 @@ export class CarrefourScraper implements RetailerScraper {
       for await (const product of crawlDepartments({
         http,
         ctx: crawlCtx,
-        departments: others,
+        departments: outside,
         counters,
         total: groceries.length + others.length,
         isGrocery: () => false,
