@@ -172,6 +172,15 @@ export function aldiShelf(html: string): string | null {
   return null
 }
 
+// Makeup, carved out of personal care on 2026-09-27: a shelf below an allowed
+// one, read from the same breadcrumb. Only Germany's tree has one.
+const CARVED_OUT = /\/(?:produkte|prodotti|products|produits)\/drogerie-kosmetik\/make-up\//
+
+/** Whether the breadcrumb files the product on a shelf carved out of groceries. */
+export function aldiIsCarvedOut(html: string): boolean {
+  return breadcrumbLinks(html).some((link) => CARVED_OUT.test(link))
+}
+
 export function isAldiGrocery(country: AldiCountry, shelf: string | null): boolean {
   return shelf !== null && Object.prototype.hasOwnProperty.call(country.shelves, shelf)
 }
@@ -249,7 +258,7 @@ export class AldiScraper implements RetailerScraper {
       supportsIncremental: true,
       // The same sitemap lists category pages; they carry no Product.
       urlFilter: (url) => isProduct.test(new URL(url).pathname),
-      keep: (html) => isAldiGrocery(config, aldiShelf(html)),
+      keep: (html) => isAldiGrocery(config, aldiShelf(html)) && !aldiIsCarvedOut(html),
       idOf: (url) => aldiIdFrom(url),
       build: (product, url, html) => buildAldiProduct(product, url, config, aldiShelf(html)),
     })

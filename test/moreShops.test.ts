@@ -45,6 +45,16 @@ describe('carrefour italia', () => {
     expect(isCarrefourItGrocery(carrefourItShelf('"item_category":"Articoli per la casa e per la tua auto"'))).toBe(false)
   })
 
+  it('carves makeup, perfume and gift sets out of personal care', () => {
+    const shelf = (sub: string, leaf = '') =>
+      carrefourItShelf(`"item_category":"Cura persona","item_category2":"${sub}","item_category3":"${leaf}"`)
+    expect(isCarrefourItGrocery(shelf('Viso', 'Makeup'))).toBe(false)
+    expect(isCarrefourItGrocery(shelf('Deodoranti', 'Profumi'))).toBe(false)
+    expect(isCarrefourItGrocery(shelf('Set regalo e cofanetti Natale'))).toBe(false)
+    expect(isCarrefourItGrocery(shelf('Viso', 'Creme viso e sieri'))).toBe(true)
+    expect(isCarrefourItGrocery(shelf('Deodoranti', 'Deodoranti spray'))).toBe(true)
+  })
+
   it('takes the barcode from the URL, and not a counter code', () => {
     const whiskas = 'https://www.carrefour.it/p/whiskas-sticks-snack-gatto-con-manzo-3-pezzi-18-g/4008429046537.html'
     const steak = 'https://www.carrefour.it/p/costata-con-osso-di-scottona/2101083000000.html'
