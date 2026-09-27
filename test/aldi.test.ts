@@ -17,7 +17,7 @@
 import { describe, it, expect } from 'vitest'
 import { readFixture, fixtureFetch, callsOf, collect, testLogger } from './helpers.ts'
 import { extractJsonLd, findProduct, readProduct } from '../src/core/jsonld.ts'
-import { ALDI_COUNTRIES, aldiShelf, isAldiGrocery, buildAldiProduct, aldiIdFrom } from '../src/retailers/aldi/index.ts'
+import { ALDI_COUNTRIES, aldiShelf, aldiIsCarvedOut, isAldiGrocery, buildAldiProduct, aldiIdFrom } from '../src/retailers/aldi/index.ts'
 import { SCRAPERS } from '../src/core/registry.ts'
 import { MARKETS } from '../src/core/types.ts'
 
@@ -73,6 +73,19 @@ describe('which shelves are groceries', () => {
     expect(keeps('aldi-it', 'it-nonfood')).toBe(false) // tempo-libero-e-attivita-outdoor
     expect(keeps('aldi-gb', 'gb-specialbuys')).toBe(false)
     expect(keeps('aldi-ie', 'ie-clothing')).toBe(false)
+  })
+
+  it('drops makeup, and not the rest of the cosmetics shelf', () => {
+    const trail = (...paths: string[]) =>
+      `<script type="application/ld+json">${JSON.stringify({
+        '@type': 'BreadcrumbList',
+        itemListElement: paths.map((path, i) => ({ position: i + 1, item: `https://www.aldi-sued.de${path}` })),
+      })}</script>`
+    const makeup = trail('/produkte/drogerie-kosmetik/k/1', '/produkte/drogerie-kosmetik/make-up/k/2')
+    const shampoo = trail('/produkte/drogerie-kosmetik/k/1', '/produkte/drogerie-kosmetik/shampoo-haarpflege/k/3')
+    expect(aldiIsCarvedOut(makeup)).toBe(true)
+    expect(aldiIsCarvedOut(shampoo)).toBe(false)
+    expect(isAldiGrocery(country('aldi-de'), aldiShelf(shampoo))).toBe(true)
   })
 
   it('drops a product with no category at all', () => {

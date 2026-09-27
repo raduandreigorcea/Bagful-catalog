@@ -37,6 +37,8 @@ const PRODUCT_URL = /^\/nl\/shop\/(.+)\/p\/([A-Z0-9]+)\/?$/
 const NOT_GROCERIES: RegExp[] = [
   /^Keuken-wonen-en-vrije-tijd\/(Huisdecoratie|Insecten-en-planten|Elektriciteit|Seizoensgebonden|Divers)\//i,
   /^Eindejaarsproducten\/Feest-accessoires\//i,
+  // Makeup, carved out of personal care on 2026-09-27.
+  /^Hygiene-en-verzorging\/Make-up\//i,
 ]
 
 const DEPARTMENTS: Record<string, Category | null> = {

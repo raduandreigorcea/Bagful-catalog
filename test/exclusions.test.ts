@@ -13,7 +13,7 @@
 import { describe, it, expect } from 'vitest'
 import { fixtureFetch, callsOf, collect, testLogger } from './helpers.ts'
 import { isAuchanGrocery } from '../src/retailers/auchan/vtex.ts'
-import { carrefourDepartmentIsGrocery } from '../src/retailers/carrefour/departments.ts'
+import { carrefourDepartmentIsGrocery, carrefourDepartmentIsCarvedOut } from '../src/retailers/carrefour/departments.ts'
 import { carrefourDepartmentsFrom } from '../src/retailers/carrefour/index.ts'
 import { megaImageIsGrocery } from '../src/retailers/mega-image/index.ts'
 import { SCRAPERS } from '../src/core/registry.ts'
@@ -43,6 +43,14 @@ describe('auchan: the category path', () => {
     expect(isAuchanGrocery(['/Craciun/Brazi artificiali si decoratiuni/'])).toBe(false)
   })
 
+  it('carves makeup, perfume and nails out of personal care, by the deepest path', () => {
+    const care = '/Ingrijire personala si Cosmetice'
+    expect(isAuchanGrocery([`${care}/Produse ingrijire fata/Machiaj/`, `${care}/Produse ingrijire fata/`, `${care}/`])).toBe(false)
+    expect(isAuchanGrocery([`${care}/Deodorante si parfumuri/Parfumuri femei/`, `${care}/Deodorante si parfumuri/`])).toBe(false)
+    expect(isAuchanGrocery([`${care}/Deodorante si parfumuri/Deodorante spray/`, `${care}/Deodorante si parfumuri/`])).toBe(true)
+    expect(isAuchanGrocery([`${care}/Produse ingrijire fata/Creme hidratante/`, `${care}/Produse ingrijire fata/`])).toBe(true)
+  })
+
   it('keeps a product filed under both a seasonal shelf and a grocery one', () => {
     expect(isAuchanGrocery(['/Bucurie de Craciun/Decoratiuni de Craciun/', '/Bacanie/Dulciuri/'])).toBe(true)
   })
@@ -66,7 +74,26 @@ describe('carrefour: the department', () => {
   it('keeps the grocery departments', () => {
     expect(carrefourDepartmentIsGrocery('https://carrefour.ro/bacanie-carrefour/alimente/cafea')).toBe(true)
     expect(carrefourDepartmentIsGrocery('https://carrefour.ro/bacanie-carrefour/')).toBe(true)
-    expect(carrefourDepartmentIsGrocery('https://carrefour.ro/cosmetice-si-ingrijire-personala/ingrijire-personala')).toBe(true)
+    expect(carrefourDepartmentIsGrocery('https://carrefour.ro/cosmetice-si-ingrijire-personala/ingrijire-personala/ingrijirea-parului')).toBe(true)
+  })
+
+  it('carves makeup, perfume and nails out of personal care', () => {
+    const cosmetics = 'https://carrefour.ro/cosmetice-si-ingrijire-personala'
+    expect(carrefourDepartmentIsGrocery(`${cosmetics}/produse-machiaj-accesorii/makeup/mascara/`)).toBe(false)
+    expect(carrefourDepartmentIsGrocery(`${cosmetics}/parfumuri/parfumuri-pentru-femei/`)).toBe(false)
+    expect(carrefourDepartmentIsGrocery(`${cosmetics}/ingrijire-personala/ingrijirea-unghiilor/oja-si-lac-de-unghii/`)).toBe(false)
+    expect(carrefourDepartmentIsCarvedOut(`${cosmetics}/parfumuri/`)).toBe(true)
+    // Not a lookalike prefix, and not the shampoo beside it.
+    expect(carrefourDepartmentIsCarvedOut(`${cosmetics}/parfumuri-extra/`)).toBe(false)
+    expect(carrefourDepartmentIsGrocery(`${cosmetics}/ingrijire-personala/igiena-orala`)).toBe(true)
+  })
+
+  it('reads no parent page that would bring the carved-out aisles back in', () => {
+    const cosmetics = 'https://carrefour.ro/cosmetice-si-ingrijire-personala'
+    expect(carrefourDepartmentIsGrocery(`${cosmetics}/`)).toBe(false)
+    expect(carrefourDepartmentIsGrocery(`${cosmetics}/ingrijire-personala/`)).toBe(false)
+    // A parent page is not evidence either way: it also shows the shampoo.
+    expect(carrefourDepartmentIsCarvedOut(`${cosmetics}/ingrijire-personala/`)).toBe(false)
   })
 
   it('keeps cleaning, kitchen and pet food out of the home department, and nothing else', () => {
@@ -105,6 +132,9 @@ describe('mega image: the department in the URL', () => {
     expect(megaImageIsGrocery(url('/Curatenie-si-nealimentare/Electronice-si-auto/Baterii/Baterie-alcalina-9V/p/49758'))).toBe(false)
     expect(megaImageIsGrocery(url('/Mama-si-ingrijire-copil/Jucarii-si-accesorii-petrecere/Balon/p/1'))).toBe(false)
     expect(megaImageIsGrocery(url('/Gaming/Controller-wireless-negru-DualSense-V2/p/1'))).toBe(false)
+    expect(megaImageIsGrocery(url('/Cosmetice-si-ingrijire-personala/Machiaj/Buze/Ruj/p/1'))).toBe(false)
+    expect(megaImageIsGrocery(url('/Cosmetice-si-ingrijire-personala/Deodorante-si-apa-de-toaleta/Apa-de-toaleta/Parfum/p/1'))).toBe(false)
+    expect(megaImageIsGrocery(url('/Cosmetice-si-ingrijire-personala/Deodorante-si-apa-de-toaleta/Pentru-ea/Deodorant/p/1'))).toBe(true)
   })
 })
 

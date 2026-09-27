@@ -207,6 +207,21 @@ const GROCERY_AISLES: Record<string, Set<string>> = {
   'sarbatoarea pastelui': new Set(['masa de paste', 'bauturi', 'dulciuri de paste', 'curatenia de paste']),
 }
 
+// MAKEUP, PERFUME AND NAILS are carved out of personal care (2026-09-27), by
+// leaf: their aisles are allowed above, and "Deodorante si parfumuri" holds the
+// deodorants too. Folded root/aisle/leaf.
+const NOT_GROCERY_LEAVES = new Set([
+  'ingrijire personala si cosmetice/parfumuri si produse sezon/parfumuri pentru ea',
+  'ingrijire personala si cosmetice/parfumuri si produse sezon/parfumuri pentru el',
+  'ingrijire personala si cosmetice/parfumuri si produse sezon/seturi cosmetice',
+  'ingrijire personala si cosmetice/produse sezon/seturi cosmetice',
+  'ingrijire personala si cosmetice/deodorante si parfumuri/parfumuri barbati',
+  'ingrijire personala si cosmetice/deodorante si parfumuri/parfumuri femei',
+  'ingrijire personala si cosmetice/deodorante si parfumuri/parfumuri arabesti',
+  'ingrijire personala si cosmetice/produse ingrijire fata/machiaj',
+  'ingrijire personala si cosmetice/produse ingrijire corp/produse manichiura si pedichiura',
+])
+
 /**
  * Whether a product is groceries, from the category paths it carries.
  *
@@ -215,9 +230,14 @@ const GROCERY_AISLES: Record<string, Set<string>> = {
  * not groceries.
  */
 export function isAuchanGrocery(categories: string[] | undefined): boolean {
-  for (const path of categories ?? []) {
-    const [root, aisle] = path.split('/').filter(Boolean).map(fold)
+  const paths = categories ?? []
+  for (const path of paths) {
+    // Only the deepest paths: a lipstick also carries its aisle's path, and
+    // that aisle is allowed. The ancestor is not a second piece of evidence.
+    if (paths.some((other) => other !== path && other.startsWith(path))) continue
+    const [root, aisle, leaf] = path.split('/').filter(Boolean).map(fold)
     if (!root) continue
+    if (leaf && NOT_GROCERY_LEAVES.has(`${root}/${aisle}/${leaf}`)) continue
     if (GROCERY_ROOTS.has(root)) return true
     if (aisle && GROCERY_AISLES[root]?.has(aisle)) return true
   }

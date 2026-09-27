@@ -69,21 +69,34 @@ const AISLES: Record<string, Category | null> = {
 // The baby aisle sells toys and pushchairs beside baby food and nappies.
 const NOT_BABY_GROCERIES = /giochi|giocattol|abbigliament|passeggin|seggiolin|culle|lettin|arred|sicurezza/
 
+// Makeup, perfume and the Christmas gift sets (perfume and shower gel in a box),
+// carved out of personal care on 2026-09-27. Folded sub-aisle, or sub/leaf.
+const NOT_PERSONAL_CARE_GROCERIES = new Set(['set regalo e cofanetti natale', 'viso/makeup', 'deodoranti/profumi'])
+
 export interface CarrefourItShelf {
   aisle: string | null
   subAisle: string | null
+  leaf: string | null
 }
 
 /** The first item_category pair on the page: the product's own view event. */
 export function carrefourItShelf(html: string): CarrefourItShelf {
   const aisle = /"item_category"\s*:\s*"([^"]*)"/.exec(html)?.[1] ?? ''
   const subAisle = /"item_category2"\s*:\s*"([^"]*)"/.exec(html)?.[1] ?? ''
-  return { aisle: aisle ? fold(aisle) : null, subAisle: subAisle ? fold(subAisle) : null }
+  const leaf = /"item_category3"\s*:\s*"([^"]*)"/.exec(html)?.[1] ?? ''
+  return { aisle: aisle ? fold(aisle) : null, subAisle: subAisle ? fold(subAisle) : null, leaf: leaf ? fold(leaf) : null }
 }
 
 export function isCarrefourItGrocery(shelf: CarrefourItShelf): boolean {
   if (shelf.aisle === null || !Object.prototype.hasOwnProperty.call(AISLES, shelf.aisle)) return false
   if (shelf.aisle === 'prima infanzia' && NOT_BABY_GROCERIES.test(shelf.subAisle ?? '')) return false
+  if (
+    shelf.aisle === 'cura persona' &&
+    (NOT_PERSONAL_CARE_GROCERIES.has(shelf.subAisle ?? '') ||
+      NOT_PERSONAL_CARE_GROCERIES.has(`${shelf.subAisle}/${shelf.leaf}`))
+  ) {
+    return false
+  }
   return true
 }
 

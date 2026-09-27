@@ -23,6 +23,8 @@ describe('delhaize: which departments are groceries', () => {
     expect(delhaizeIsGrocery(url('/nl/shop/Keuken-wonen-en-vrije-tijd/Insecten-en-planten/Orchidee/p/S3'))).toBe(false)
     expect(delhaizeIsGrocery(url('/nl/shop/Keuken-wonen-en-vrije-tijd/Elektriciteit/Lamp/p/S4'))).toBe(false)
     expect(delhaizeIsGrocery(url('/nl/shop/Eindejaarsproducten/Feest-accessoires/Slingers/p/S5'))).toBe(false)
+    expect(delhaizeIsGrocery(url('/nl/shop/Hygiene-en-verzorging/Make-up/Mascara/Mascara-Zwart/p/S6'))).toBe(false)
+    expect(delhaizeIsGrocery(url('/nl/shop/Hygiene-en-verzorging/Shampoos/Shampoo/p/S7'))).toBe(true)
   })
 
   it('refuses a French page and anything that is not a product', () => {

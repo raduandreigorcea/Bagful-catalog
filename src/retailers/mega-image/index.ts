@@ -105,6 +105,10 @@ const NOT_GROCERIES: RegExp[] = [
   /^\/Gaming\//i,
   /^\/Curatenie-si-nealimentare\/Electronice-si-auto\//i,
   /^\/Mama-si-ingrijire-copil\/Jucarii-si-accesorii-petrecere\//i,
+  // Makeup and perfume, carved out of personal care on 2026-09-27. The
+  // "Pentru-ea" and "Pentru-el" shelves beside eau de toilette are deodorants.
+  /^\/Cosmetice-si-ingrijire-personala\/Machiaj\//i,
+  /^\/Cosmetice-si-ingrijire-personala\/Deodorante-si-apa-de-toaleta\/Apa-de-toaleta\//i,
 ]
 
 export function megaImageIsGrocery(url: string): boolean {
