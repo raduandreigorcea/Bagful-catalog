@@ -62,12 +62,13 @@ jobs:
       # fail-fast stays off, so one shop failing still takes nobody down, and
       # wrong credentials still show within minutes, in all four at once.
       #
-      # Kaufland joined on 2026-09-29: one request for its weekly leaflet, and a
-      # run that never sweeps (see src/retailers/kaufland).
-      max-parallel: 5
+      # Kaufland and Penny joined on 2026-09-29: their promotions only (one
+      # leaflet page; ~580 product pages), in runs that never sweep (see
+      # src/retailers/kaufland and src/retailers/penny).
+      max-parallel: 6
       fail-fast: false
       matrix:
-        retailer: [lidl, mega-image, auchan, carrefour, kaufland]
+        retailer: [lidl, mega-image, auchan, carrefour, kaufland, penny]
     # SIX HOURS, GitHub's ceiling for a hosted job, since 2026-09-17: Carrefour's
     # grocery pass alone measured 4 h 41 min, too close to the five it had.
     #
