@@ -197,5 +197,11 @@ export interface RetailerScraper {
   readonly implemented: boolean
   /** Why, in one line, when implemented is false. */
   readonly note?: string
+  /**
+   * False for a shop whose site shows a changing SLICE of what it sells, so a
+   * product it did not show tonight is still on the shelf: Kaufland's weekly
+   * leaflet. Every run then closes as a deliberate partial and never sweeps.
+   */
+  readonly sweeps?: boolean
   discoverProducts(ctx: ScrapeContext): AsyncGenerator<RetailerProduct>
 }

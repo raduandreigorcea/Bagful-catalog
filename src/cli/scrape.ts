@@ -257,6 +257,8 @@ async function scrapeOne(
       ? `--shard ${args.shard.index + 1}/${args.shard.of}: one slice of the shop, by design`
       : args.limit !== undefined
         ? `--limit ${args.limit}: a deliberate partial run`
+      : scraper.sweeps === false
+        ? 'never sweeps, by design: the shop shows a slice of its shelf, not all of it'
         : null
 
     if (deliberate !== null) {

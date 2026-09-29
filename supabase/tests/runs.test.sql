@@ -132,7 +132,7 @@ select is((select count(*)::int from public.catalog_listings l
   'a Carrefour failure changes nothing about Auchan');
 
 select throws_ok(
-  $$select public.catalog_run_open('kaufland')$$,
+  $$select public.catalog_run_open('dia-es')$$,
   'P0001', null,
   'opening a run for a retailer with no row is a loud error');
 

@@ -69,7 +69,7 @@ select is((select count(*)::int from public.catalog_admin_products(p_query := 'd
 -- exactly like an empty category.
 select throws_ok($$select * from public.catalog_admin_products(p_category := 'nonsense')$$,
   'P0001', null, 'an unknown category is an error, not an empty page');
-select throws_ok($$select * from public.catalog_admin_products(p_retailer := 'kaufland')$$,
+select throws_ok($$select * from public.catalog_admin_products(p_retailer := 'dia-es')$$,
   'P0001', null, 'and so is an unknown retailer');
 
 -- ─── create, update, delete ──────────────────────────────────────────────────

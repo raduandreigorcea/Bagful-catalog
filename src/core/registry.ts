@@ -1,4 +1,4 @@
-// Every retailer the catalog knows about, including the one it cannot read.
+// Every retailer the catalog knows about, including the ones it cannot read.
 //
 // ADDING A RETAILER MEANS ADDING A LINE HERE and a directory under
 // src/retailers/. Nothing else in the pipeline needs to change, which is the
@@ -24,6 +24,7 @@ import { carrefourIt } from '../retailers/carrefour-it/index.ts'
 import { mpreis } from '../retailers/mpreis/index.ts'
 import { delhaize } from '../retailers/delhaize/index.ts'
 import { megaImage } from '../retailers/mega-image/index.ts'
+import { kaufland } from '../retailers/kaufland/index.ts'
 
 /** A retailer that has been looked at and cannot currently be read. */
 class UnimplementedScraper implements RetailerScraper {
@@ -51,17 +52,10 @@ class UnimplementedScraper implements RetailerScraper {
   }
 }
 
-export const kaufland = new UnimplementedScraper(
-  'kaufland',
-  'RO',
-  'kaufland.ro',
-  'kaufland.ro has no online assortment (checked 2026-09-09): its sitemap is 3,472 URLs and ' +
-    'holds 2,283 recipes, 502 pages of an ingredient encyclopedia, brand and blog pages, and no ' +
-    'product. It DOES publish the weekly leaflet as structured data on ' +
-    '/oferte/oferte-saptamanale/saptamana-curenta.html -- 371 offers with prices, in a window.SSR ' +
-    'blob -- but that is this week promotions rather than an assortment, so a shop badge from it ' +
-    'would mean "on offer here until Sunday" where every other badge means "sold here".',
-)
+// KAUFLAND WAS AN UnimplementedScraper HERE, noted 2026-09-09 as having no
+// online assortment, which is still true. It is read from its weekly leaflet
+// since 2026-09-29; why that is enough, and why such a run never sweeps, is in
+// the header of src/retailers/kaufland.
 
 export const diaEs = new UnimplementedScraper(
   'dia-es',
