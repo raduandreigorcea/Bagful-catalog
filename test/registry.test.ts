@@ -9,7 +9,7 @@
 import { describe, it, expect } from 'vitest'
 import { readdirSync, readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
-import { SCRAPERS, IMPLEMENTED, scraperFor, kaufland } from '../src/core/registry.ts'
+import { SCRAPERS, IMPLEMENTED, scraperFor, diaEs } from '../src/core/registry.ts'
 import { MARKETS, isMarket } from '../src/core/types.ts'
 
 const MIGRATIONS = fileURLToPath(new URL('../supabase/migrations/', import.meta.url))
@@ -60,8 +60,8 @@ describe('the retailer registry', () => {
   it('keeps the unreadable retailer listed rather than deleting it', () => {
     // Deleting the entry means the next person re-does the analysis and reaches
     // the same conclusion.
-    expect(SCRAPERS).toContain(kaufland)
-    expect(kaufland.implemented).toBe(false)
+    expect(SCRAPERS).toContain(diaEs)
+    expect(diaEs.implemented).toBe(false)
   })
 
   it('dates the analysis, because an undated one reads as permanent', () => {
@@ -95,7 +95,7 @@ describe('the retailer registry', () => {
 
   it('throws rather than silently yielding nothing when one is asked to crawl', async () => {
     await expect(async () => {
-      for await (const _ of kaufland.discoverProducts()) { /* unreachable */ }
+      for await (const _ of diaEs.discoverProducts()) { /* unreachable */ }
     }).rejects.toThrow(/no scraper/)
   })
 

@@ -219,7 +219,7 @@ select is((select count(*)::int from public.catalog_identifiers where source = '
 
 -- ─── the retailer must exist ─────────────────────────────────────────────────
 select throws_ok(
-  $$select public.catalog_import_listings('[]'::jsonb, 'kaufland')$$,
+  $$select public.catalog_import_listings('[]'::jsonb, 'dia-es')$$,
   'P0001', null,
   'importing for a retailer with no row is a loud error, not a silent no-op');
 

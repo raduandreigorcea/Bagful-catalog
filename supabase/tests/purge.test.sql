@@ -55,7 +55,7 @@ select is(public.catalog_purge_listings(array['NOPE'], 'carrefour'),
 select is((select count(*)::int from public.catalog_products where canonical_name = 'Produs adaugat manual'), 1,
   'and a product made by hand is never reached');
 
-select throws_ok($$select public.catalog_purge_listings(array['A1'], 'kaufland')$$, 'P0001', null,
+select throws_ok($$select public.catalog_purge_listings(array['A1'], 'dia-es')$$, 'P0001', null,
   'an unknown retailer is an error, not a silent no-op');
 
 select * from finish();

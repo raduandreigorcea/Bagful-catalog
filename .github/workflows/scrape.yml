@@ -61,10 +61,13 @@ jobs:
       # hours, so Romania's prices were the last thing the night delivered.
       # fail-fast stays off, so one shop failing still takes nobody down, and
       # wrong credentials still show within minutes, in all four at once.
-      max-parallel: 4
+      #
+      # Kaufland joined on 2026-09-29: one request for its weekly leaflet, and a
+      # run that never sweeps (see src/retailers/kaufland).
+      max-parallel: 5
       fail-fast: false
       matrix:
-        retailer: [lidl, mega-image, auchan, carrefour]
+        retailer: [lidl, mega-image, auchan, carrefour, kaufland]
     # SIX HOURS, GitHub's ceiling for a hosted job, since 2026-09-17: Carrefour's
     # grocery pass alone measured 4 h 41 min, too close to the five it had.
     #
