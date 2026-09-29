@@ -32,13 +32,33 @@ export interface JsonLdProduct {
 }
 
 const SCRIPT_RE = /<script[^>]*type\s*=\s*["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi
+// Penny renders the block as an ATTRIBUTE of an empty script tag, HTML-escaped:
+// <script children="{&quot;@type&quot;:...}" type="application/ld+json"></script>
+const CHILDREN_RE = /<script\b[^>]*?\schildren="([^"]*)"[^>]*>/gi
+
+function unescapeAttribute(value: string): string {
+  return value
+    .replace(/&quot;/g, '"')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&#x27;|&#39;/g, "'")
+    // Ampersand LAST, or "&amp;quot;" would decode twice.
+    .replace(/&amp;/g, '&')
+}
 
 /** Every ld+json block in a page, parsed, skipping the ones that are not JSON. */
 export function extractJsonLd(html: string): unknown[] {
-  const out: unknown[] = []
+  const blocks: string[] = []
   SCRIPT_RE.lastIndex = 0
-  for (let m = SCRIPT_RE.exec(html); m !== null; m = SCRIPT_RE.exec(html)) {
-    const text = m[1].trim()
+  for (let m = SCRIPT_RE.exec(html); m !== null; m = SCRIPT_RE.exec(html)) blocks.push(m[1])
+  CHILDREN_RE.lastIndex = 0
+  for (let m = CHILDREN_RE.exec(html); m !== null; m = CHILDREN_RE.exec(html)) {
+    if (/application\/ld\+json/i.test(m[0])) blocks.push(unescapeAttribute(m[1]))
+  }
+
+  const out: unknown[] = []
+  for (const block of blocks) {
+    const text = block.trim()
     if (!text) continue
     try {
       out.push(JSON.parse(text))

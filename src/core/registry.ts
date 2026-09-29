@@ -25,6 +25,7 @@ import { mpreis } from '../retailers/mpreis/index.ts'
 import { delhaize } from '../retailers/delhaize/index.ts'
 import { megaImage } from '../retailers/mega-image/index.ts'
 import { kaufland } from '../retailers/kaufland/index.ts'
+import { penny } from '../retailers/penny/index.ts'
 
 /** A retailer that has been looked at and cannot currently be read. */
 class UnimplementedScraper implements RetailerScraper {
@@ -91,6 +92,7 @@ export const SCRAPERS: RetailerScraper[] = [
   delhaize,
   megaImage,
   kaufland,
+  penny,
   diaEs,
 ]
 
