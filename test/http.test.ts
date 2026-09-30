@@ -198,7 +198,7 @@ describe('HttpClient', () => {
     const clock = fakeClock()
     await new HttpClient({ fetchImpl: impl, minIntervalMs: 0, ...clock }).get('https://example.test/a')
     const agent = (seen as Record<string, string>)['user-agent']
-    expect(agent).toContain('FamCart')
+    expect(agent).toContain('Bagful')
     expect(agent).toContain('https://')
   })
 
