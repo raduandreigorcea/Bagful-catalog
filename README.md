@@ -1,8 +1,8 @@
-# FamCart Catalog
+# Bagful Catalog
 
 A catalog of what real shops actually sell.
 
-FamCart is a shopping list. When somebody types `lapte`, the useful answer is the
+Bagful is a shopping list. When somebody types `lapte`, the useful answer is the
 milk they can pick up this afternoon at a shop near them -- not a milk-shaped
 concept, and not a product that exists in a database somewhere in the world.
 
@@ -28,7 +28,7 @@ Open Food Facts, Open Products Facts or Open Beauty Facts.
 ## The shape of it
 
 ```
-retailer site  →  scraper  →  RetailerProduct  →  validation  →  importer  →  catalog  →  FamCart
+retailer site  →  scraper  →  RetailerProduct  →  validation  →  importer  →  catalog  →  Bagful
 ```
 
 ```

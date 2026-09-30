@@ -64,7 +64,7 @@ export const diaEs = new UnimplementedScraper(
   'dia.es',
   'dia.es refuses this crawler (checked 2026-09-14): its robots.txt allows product pages, and ' +
     'the same sitemap answers 200 to a user agent without "Bot" in it, but 403 to ' +
-    'FamCartCatalogBot. That is the shop saying no to crawlers, and this repository does not ' +
+    'BagfulCatalogBot. That is the shop saying no to crawlers, and this repository does not ' +
     'disguise itself to get past a no. The site would otherwise read well: 6,381 products in a ' +
     'Product block with a price, the aisle in every URL, no barcode and no brand.',
 )

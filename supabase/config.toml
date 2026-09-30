@@ -16,7 +16,7 @@
 # supabase/.temp/*, so a CLI shared between the two projects means every catalog
 # command silently repoints the app commands at the wrong database. Two
 # directories, two link states, no way to confuse them.
-project_id = "famcart-catalog"
+project_id = "bagful-catalog"
 
 [db]
 # Deliberately not 54322: `supabase start` at the repo root already owns that

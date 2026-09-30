@@ -28,7 +28,7 @@ import { execFileSync } from 'node:child_process'
 import { writeFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 
-const CONTAINER = process.env.CATALOG_DB_CONTAINER ?? 'supabase_db_famcart-catalog'
+const CONTAINER = process.env.CATALOG_DB_CONTAINER ?? 'supabase_db_bagful-catalog'
 const SEP = ''
 
 // Chosen for the ways a fold can be wrong rather than for coverage: Romanian

@@ -56,7 +56,7 @@ export interface HttpResponse {
 }
 
 const DEFAULT_UA =
-  'FamCartCatalogBot/1.0 (+https://famcart-app.vercel.app; shopping list; polite, cached, low rate)'
+  'BagfulCatalogBot/1.0 (+https://famcart-app.vercel.app; shopping list; polite, cached, low rate)'
 
 export class CircuitOpenError extends Error {
   /**
