@@ -3,7 +3,7 @@
   "version": "2.0.0",
   "private": true,
   "type": "module",
-  "description": "The FamCart product catalog: what real retailers actually list, scraped, matched and searchable.",
+  "description": "The Bagful product catalog: what real retailers actually list, scraped, matched and searchable.",
   "scripts": {
     "scrape": "node --max-http-header-size=65536 --experimental-strip-types src/cli/scrape.ts",
     "scrape:auchan": "node --max-http-header-size=65536 --experimental-strip-types src/cli/scrape.ts auchan",
