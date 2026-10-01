@@ -1,6 +1,6 @@
 -- ─── the images go ───────────────────────────────────────────────────────────
 -- Nothing read them. The app never did: `search_catalog` does not return the
--- column and never has, so every product picture in FamCart comes from the
+-- column and never has, so every product picture in Bagful comes from the
 -- household's own data. The admin dashboard did -- a thumbnail in the command
 -- palette, a URL field in the product form, a "has an image" filter -- and that
 -- was the whole audience: a picture nobody outside the dashboard could see,
