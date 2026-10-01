@@ -1,5 +1,5 @@
 -- ─── the admin surface ───────────────────────────────────────────────────────
--- Everything the dashboard at raduandreigorcea/FamCart-admin can do to this
+-- Everything the dashboard at raduandreigorcea/Bagful-admin can do to this
 -- project. EVERYTHING HERE IS AN RPC and that is not a style choice: 002 revokes
 -- all table privileges from `authenticated`, so there is no table access to fall
 -- back on even for an admin, and these functions are the entire surface.
