@@ -26,7 +26,13 @@ export interface PageCrawlOptions {
   /** Product-URL sitemaps, already resolved. */
   sitemapUrls: string[]
   /** Turn a parsed Product block plus its URL into a listing, or null to skip. */
-  build: (product: JsonLdProduct, url: string, html: string) => RetailerProduct | null
+  build?: (product: JsonLdProduct, url: string, html: string) => RetailerProduct | null
+  /**
+   * Instead of `build`, for a shop with no Product block that puts the product
+   * only in its page state (Aldi Nord: Next.js data). Null is a page with no
+   * product, counted like a page with no block.
+   */
+  buildPage?: (html: string, url: string) => RetailerProduct | null
   /**
    * Which of the sitemap's URLs are product pages.
    *
@@ -262,13 +268,13 @@ export async function* crawlProductPages(
       continue
     }
 
-    const node = findProduct(extractJsonLd(response.body))
-    if (!node) {
-      counters.noProduct++
-      continue
+    let product: RetailerProduct | null
+    if (options.buildPage) {
+      product = options.buildPage(response.body, entry.loc)
+    } else {
+      const node = findProduct(extractJsonLd(response.body))
+      product = node && build ? build(readProduct(node), entry.loc, response.body) : null
     }
-
-    const product = build(readProduct(node), entry.loc, response.body)
     if (!product) {
       counters.noProduct++
       continue

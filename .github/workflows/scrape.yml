@@ -150,6 +150,8 @@ jobs:
           - aldi-it
           - aldi-gb
           - aldi-ie
+          - aldi-fr
+          - aldi-es
           - carrefour-it
           - mpreis
           - delhaize

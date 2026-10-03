@@ -20,6 +20,7 @@ import { auchan } from '../retailers/auchan/index.ts'
 import { carrefour } from '../retailers/carrefour/index.ts'
 import { LIDL_SCRAPERS } from '../retailers/lidl/index.ts'
 import { ALDI_SCRAPERS } from '../retailers/aldi/index.ts'
+import { ALDI_NORD_SCRAPERS } from '../retailers/aldi-nord/index.ts'
 import { carrefourIt } from '../retailers/carrefour-it/index.ts'
 import { mpreis } from '../retailers/mpreis/index.ts'
 import { delhaize } from '../retailers/delhaize/index.ts'
@@ -81,12 +82,13 @@ export const diaEs = new UnimplementedScraper(
 // checked, for that reason.
 
 // Lidl and Aldi are one scraper per country, each chain one class: see
-// LIDL_COUNTRIES and ALDI_COUNTRIES.
+// LIDL_COUNTRIES, ALDI_COUNTRIES and ALDI_NORD_COUNTRIES.
 export const SCRAPERS: RetailerScraper[] = [
   auchan,
   carrefour,
   ...LIDL_SCRAPERS,
   ...ALDI_SCRAPERS,
+  ...ALDI_NORD_SCRAPERS,
   carrefourIt,
   mpreis,
   delhaize,

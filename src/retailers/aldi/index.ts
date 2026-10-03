@@ -6,7 +6,7 @@
 // long numeric id, a Product block with a price and a stock state, and a
 // BreadcrumbList. Checked on all six live sites on 2026-09-14. (Aldi Nord --
 // Germany's north, Spain, France, Belgium -- is a different company with a
-// different site that publishes no product pages, and is not here.)
+// different site, read for France and Spain by src/retailers/aldi-nord.)
 //
 // NO BARCODE, ANYWHERE. So an Aldi listing merges with another shop's only when
 // the names and sizes fold identically, the same accepted cost as Carrefour and
