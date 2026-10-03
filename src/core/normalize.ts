@@ -187,6 +187,19 @@ export function usableBrand(brand: string | null | undefined): string | null {
   return value
 }
 
+/** "HANUL BOIERESC CEAFA" -> "Hanul boieresc ceafa"; mixed case is left alone. */
+export function unshout(text: string): string {
+  if (text !== text.toUpperCase()) return text
+  const lower = text.toLowerCase()
+  return lower.charAt(0).toUpperCase() + lower.slice(1)
+}
+
+/** A brand in capitals, word by word: "HANUL BOIERESC" -> "Hanul Boieresc". */
+export function unshoutBrand(brand: string | null): string | null {
+  if (brand === null || brand !== brand.toUpperCase()) return brand
+  return brand.toLowerCase().replace(/(^|\s)\S/g, (c) => c.toUpperCase())
+}
+
 /** https only, and short enough for the column. */
 export function httpsUrl(url: string | null | undefined, maxLength = 1000): string | null {
   const value = String(url ?? '').trim()

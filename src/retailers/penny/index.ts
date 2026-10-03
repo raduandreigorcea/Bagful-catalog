@@ -30,7 +30,7 @@ import { fetchRobots, isAllowed } from '../../core/robots.ts'
 import { crawlProductPages } from '../../core/pageCrawl.ts'
 import { extractJsonLd, findProduct } from '../../core/jsonld.ts'
 import type { JsonLdProduct } from '../../core/jsonld.ts'
-import { parseQuantity, fold, usableBrand } from '../../core/normalize.ts'
+import { parseQuantity, fold, usableBrand, unshout, unshoutBrand } from '../../core/normalize.ts'
 
 const ORIGIN = 'https://www.penny.ro'
 const SITEMAP = `${ORIGIN}/sitemap.xml`
@@ -75,19 +75,6 @@ function shelf(path: string | null): [RegExp, Category | null] | undefined {
 export function pennyIsGrocery(path: string | null): boolean {
   const found = shelf(path)
   return found !== undefined && found[1] !== null
-}
-
-/** "HANUL BOIERESC CEAFA" -> "Hanul boieresc ceafa"; mixed case is left alone. */
-function unshout(text: string): string {
-  if (text !== text.toUpperCase()) return text
-  const lower = text.toLowerCase()
-  return lower.charAt(0).toUpperCase() + lower.slice(1)
-}
-
-/** A brand in capitals, word by word: "HANUL BOIERESC" -> "Hanul Boieresc". */
-function unshoutBrand(brand: string | null): string | null {
-  if (brand === null || brand !== brand.toUpperCase()) return brand
-  return brand.toLowerCase().replace(/(^|\s)\S/g, (c) => c.toUpperCase())
 }
 
 export function buildPennyProduct(product: JsonLdProduct, url: string, path: string | null): RetailerProduct | null {
