@@ -93,6 +93,31 @@ describe('which shelves are groceries', () => {
   })
 })
 
+describe('Germany', () => {
+  it('reads a German page with the same reader, under the shelf key the PAGE names', () => {
+    expect(readAldiNordPage(page('de-food'))).toMatchObject({
+      id: '4318',
+      name: 'Prinzessbohnen',
+      salesUnit: '425-ml-Dose',
+      price: 1.19,
+      shelf: 'vorraete-back-kochzutaten',
+      aisle: 'gemuesekonserven',
+    })
+    expect(keeps('aldi-nord-de', 'de-food')).toBe(true)
+  })
+
+  it('leaves the weekly offers out whole: a fleece shirt and a cheesecake look the same', () => {
+    expect(readAldiNordPage(page('de-offer'))).toMatchObject({ name: 'Fleeceshirt', shelf: 'Angebote', aisle: null })
+    expect(keeps('aldi-nord-de', 'de-offer')).toBe(false)
+  })
+
+  it('drops the batteries from the household shelf', () => {
+    const batteries = { ...readAldiNordPage(page('de-food'))!, shelf: 'haushalt', aisle: 'batterien-akkus-feuerzeuge' }
+    expect(isAldiNordGrocery(country('aldi-nord-de'), batteries)).toBe(false)
+    expect(isAldiNordGrocery(country('aldi-nord-de'), { ...batteries, aisle: 'waschmittel-weichspueler' })).toBe(true)
+  })
+})
+
 describe('building a listing', () => {
   it('takes the size from the sales unit and drops the trademark sign', () => {
     const url = 'https://www.aldi.fr/fiches-produits/cornichons-extra-fins-4416.html'

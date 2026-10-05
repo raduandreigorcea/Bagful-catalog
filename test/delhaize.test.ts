@@ -4,7 +4,7 @@
 import { describe, it, expect } from 'vitest'
 import { readFixture, fixtureFetch, callsOf, collect, testLogger } from './helpers.ts'
 import { extractJsonLd, findProduct, readProduct } from '../src/core/jsonld.ts'
-import { delhaizeIsGrocery, delhaizeIdFrom, buildDelhaizeProduct } from '../src/retailers/delhaize/index.ts'
+import { delhaizeIsGrocery, delhaizeIdFrom, buildDelhaizeProduct, delhaizeDepartments } from '../src/retailers/delhaize/index.ts'
 import { SCRAPERS } from '../src/core/registry.ts'
 
 const url = (path: string) => `https://www.delhaize.be${path}`
@@ -56,10 +56,15 @@ describe('delhaize: the crawl', () => {
     let coverage: [number, number] | null = null
     const fetchImpl = fixtureFetch([
       { match: '/robots.txt', body: 'User-agent: *\nDisallow: /login\n' },
+      // The homepage tiles, then one department: a page of two products
+      // (each linked twice, as the image and the name are), then an empty page.
+      { match: /\.be\/nl$/, body: '<a href="/c/v2FRU">Fruit</a><a href="/c/v2FRU">Fruit</a>' },
       {
-        match: 'delhaizesitemapindex',
-        body: `<urlset><url><loc>${MUSHROOMS}</loc><lastmod>2026-09-14</lastmod></url><url><loc>${DECORATION}</loc><lastmod>2026-09-14</lastmod></url></urlset>`,
+        match: '/c/v2FRU?pageNumber=0',
+        body: [MUSHROOMS, MUSHROOMS, DECORATION, url('/fr/shop/Legumes/p/F2015021100304110000')]
+          .map((u) => `<a href="${new URL(u).pathname}">x</a>`).join(''),
       },
+      { match: '/c/v2FRU?pageNumber=1', body: '<div>0 producten</div>' },
       { match: '/p/F2015021100304110000', file: 'delhaize/food.html.gz' },
     ])
     const products = await collect(
@@ -77,5 +82,36 @@ describe('delhaize: the crawl', () => {
     expect(excluded).toEqual(['S2023010100000000000'])
     expect(callsOf(fetchImpl).some((u) => u.includes('Huisdecoratie'))).toBe(false)
     expect(coverage).toEqual([2, 2])
+  })
+})
+
+describe('delhaize: the departments the homepage links', () => {
+  it('reads each tile once', () => {
+    expect(delhaizeDepartments('<a href="/c/v2DRI">x</a><a href="/c/v2DRI">x</a><a href="/c/v2ALC">x</a><a href="/nl/shop/Baby/c/v2BAB">x</a>'))
+      .toEqual(['v2DRI', 'v2ALC'])
+  })
+})
+
+describe('delhaize: a nightly slice', () => {
+  it('walks only its share of the departments, and reads every product in them', async () => {
+    const page = (path: string) => `<a href="${path}">x</a>`
+    const fetchImpl = fixtureFetch([
+      { match: '/robots.txt', body: 'User-agent: *\nDisallow: /login\n' },
+      { match: /\.be\/nl$/, body: '<a href="/c/v2FRU">a</a><a href="/c/v2DRI">b</a><a href="/c/v2BAB">c</a>' },
+      { match: '/c/v2DRI?pageNumber=0', body: page('/nl/shop/Koude-en-warme-dranken/Water/Spa/p/S1') + page('/nl/shop/Koude-en-warme-dranken/Thee/Thee/p/S2') },
+      { match: '/p/S', file: 'delhaize/food.html.gz' },
+    ])
+    const products = await collect(
+      SCRAPERS.find((s) => s.retailer === 'delhaize')!.discoverProducts({
+        log: testLogger(),
+        fetchImpl,
+        minIntervalMs: 0,
+        shard: { index: 1, of: 3 },
+      }),
+    )
+    const calls = callsOf(fetchImpl)
+    expect(calls.some((u) => u.includes('v2FRU') || u.includes('v2BAB'))).toBe(false)
+    expect(calls.filter((u) => u.includes('/p/S'))).toHaveLength(2)
+    expect(products).toHaveLength(2)
   })
 })

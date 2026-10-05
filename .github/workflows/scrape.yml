@@ -152,9 +152,14 @@ jobs:
           - aldi-ie
           - aldi-fr
           - aldi-es
+          - aldi-nord-de
           - carrefour-it
           - mpreis
           - delhaize
+          - supervalu
+          - picard
+          - morrisons
+          - condis
     timeout-minutes: 300
     steps:
       - uses: actions/checkout@v7
