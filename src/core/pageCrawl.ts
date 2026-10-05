@@ -25,6 +25,12 @@ export interface PageCrawlOptions {
   ctx: ScrapeContext
   /** Product-URL sitemaps, already resolved. */
   sitemapUrls: string[]
+  /**
+   * Instead of sitemaps, for a shop that took its sitemap down (Delhaize,
+   * 2026-10-03): the product URLs, found some other way. Undated, so a run
+   * with `supportsIncremental` fetches them all.
+   */
+  listUrls?: () => Promise<string[]>
   /** Turn a parsed Product block plus its URL into a listing, or null to skip. */
   build?: (product: JsonLdProduct, url: string, html: string) => RetailerProduct | null
   /**
@@ -140,7 +146,9 @@ export async function* crawlProductPages(
     urls: 0, fetched: 0, skipped: 0, delisted: 0, noProduct: 0, excluded: 0, failed: 0,
   }
 
-  const all = await collectSitemapEntries(http, ctx, options.sitemapUrls)
+  const all = options.listUrls
+    ? (await options.listUrls()).map((loc) => ({ loc, lastmod: null }))
+    : await collectSitemapEntries(http, ctx, options.sitemapUrls)
   const entries = options.urlFilter ? all.filter((e) => options.urlFilter!(e.loc)) : all
   counters.urls = entries.length
   if (all.length !== entries.length) {

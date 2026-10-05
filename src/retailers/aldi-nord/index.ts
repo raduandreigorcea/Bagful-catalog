@@ -1,13 +1,14 @@
-// Aldi Nord: France and Spain, read from the product data in each page's
-// Next.js state. ONE SCRAPER, TWO COUNTRIES.
+// Aldi Nord: France, Spain and Germany, read from the product data in each
+// page's Next.js state. ONE SCRAPER, THREE COUNTRIES.
 //
 // A different company from Aldi Süd (src/retailers/aldi) with a different site.
 // aldi.fr and aldi.es list every product in /.aldi-nord-sitemap-products.xml,
 // and each product page carries no schema.org block at all: the product sits in
 // __NEXT_DATA__, as a JSON STRING inside it (`props.pageProps.apiData`), with
 // its name, brand, sales unit, price and the shelf it is filed on. Checked with
-// the crawler's own user agent on 2026-10-03. Belgium and Germany's north run
-// the same platform and are not read yet.
+// the crawler's own user agent on 2026-10-03; Germany (aldi-nord.de, /produkt/,
+// `aldi-nord-de` because `aldi-de` is Aldi Süd) on 2026-10-05. Belgium runs the
+// same platform and is not read yet.
 //
 // NO BARCODE, ANYWHERE, the same accepted cost as Aldi Süd and Carrefour.
 //
@@ -21,6 +22,12 @@
 // engines, filed under `maintien-seo` with no price and no stock, and the
 // allowlist refuses them like any other unknown shelf. Spain's retired pages
 // carry no product at all and count as pages without one.
+//
+// A QUARTER OF GERMANY IS WEEKLY OFFERS, filed under `Angebote` with no finer
+// shelf: cheesecake beside gloves, fleece shirts and potted plants. Nothing on
+// the page tells them apart, so the allowlist leaves the whole shelf out, and
+// the seasonal ones (wintersortiment, ostern) and the highlights (which hold an
+// air fryer) with it. ~1,700 of its 2,234 pages are groceries.
 
 import type { RetailerProduct, RetailerScraper, ScrapeContext, Market, Category } from '../../core/types.ts'
 import { HttpClient } from '../../core/http.ts'
@@ -84,9 +91,32 @@ const SPAIN: Record<string, Category | null> = {
   mascotas: 'pet',
 }
 
+// The shelf keys the PAGES name, sampled from 190 pages on 2026-10-05. They
+// differ from the URLs: /sortiment/vorraete/ is `vorraete-back-kochzutaten`.
+const GERMANY: Record<string, Category | null> = {
+  'obst-gemuese': 'produce',
+  'fleisch-wurst': 'meat',
+  'fisch-meeresfruechte': 'fish',
+  milchprodukte: 'dairy',
+  'backwaren-aufstriche-cerealien': 'bakery',
+  'vorraete-back-kochzutaten': 'pantry',
+  fertiggerichte: null,
+  grillen: null,
+  'vegane-produkte': null,
+  'eis-kuchen-desserts': null,
+  'snacks-suessigkeiten': 'snacks',
+  'getraenke-heissgetraenke': 'drinks',
+  'alkoholische-getraenke': 'alcohol',
+  haushalt: 'household',
+  'kosmetik-pflege': 'personal-care',
+  babybedarf: 'baby',
+  'tierbedarf-tierfutter': 'pet',
+}
+
 export const ALDI_NORD_COUNTRIES: readonly AldiNordCountry[] = [
   { slug: 'aldi-fr', country: 'FR', origin: 'https://www.aldi.fr', productPrefix: '/fiches-produits/', currency: 'EUR', shelves: FRANCE },
   { slug: 'aldi-es', country: 'ES', origin: 'https://www.aldi.es', productPrefix: '/producto/', currency: 'EUR', shelves: SPAIN },
+  { slug: 'aldi-nord-de', country: 'DE', origin: 'https://www.aldi-nord.de', productPrefix: '/produkt/', currency: 'EUR', shelves: GERMANY },
 ]
 
 /** The id every product URL ends in, "potimarron-0811.html" -> "0811". */
@@ -161,8 +191,8 @@ export function readAldiNordPage(html: string): AldiNordPage | null {
 
 // Makeup, perfume and nails, carved out of personal care on 2026-09-27 for
 // every shop: an aisle below an allowed shelf. Spain's `cosmetica` is its
-// perfume aisle.
-const CARVED_OUT = /maquill|parfum|perfum|cosmetica|ongle|vernis|unas|manicur/
+// perfume aisle. Germany's household shelf also holds batteries and lighters.
+const CARVED_OUT = /maquill|parfum|perfum|cosmetica|ongle|vernis|unas|manicur|batterien/
 
 // France publishes promotion placeholders as products ("Assortment in Promotion
 // II - Next week offer"): a slot in the leaflet, not something on a shelf.
