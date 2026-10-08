@@ -456,8 +456,8 @@ grant execute on function public.catalog_match_groups() to service_role;
 --
 -- A pair counts only when its two products have different match keys (equal keys
 -- are the cleanup's job) and no shop lists both (a shop listing both sells two
--- products). A group is shown while it has at least one such pair not rejected;
--- rejections are kept in catalog_merge_rejections, above. Two products that
+-- products). Each such pair not rejected is one candidate; rejections are
+-- kept in catalog_merge_rejections, above. Two products that
 -- both carry a barcode can still appear, and the merge refuses them by name.
 
 -- brand | size | pack: the match key without its words.
@@ -539,23 +539,17 @@ begin
         where r.product_a = x.id and r.product_b = y.id
      )
   ),
-  -- Most alike first: a person's time goes to the likeliest merges, and the
-  -- doubtful ones sink to the last pages.
+  -- PAIRS, not families: words like "balsam" and "par" chain every Pantene 160 ml
+  -- into one family of 22, which nobody can decide on. Most alike first, so a
+  -- person's time goes to the likeliest merges and the doubtful ones sink.
+  -- `family` keeps the family in front, then the pair, so it is unique per row.
   page as (
-    select p.fam, max(p.score) as best, count(*) over () as total
+    select p.fam || '|' || p.a || '|' || p.b as key, p.a, p.b, p.score, count(*) over () as total
       from pairs p
-     group by p.fam
-     order by max(p.score) desc, p.fam
+     order by p.score desc, p.fam, p.a, p.b
      limit greatest(1, least(coalesce(p_limit, 25), 100)) offset greatest(0, coalesce(p_offset, 0))
-  ),
-  -- Only products in an offered pair: the rest of the family is not a question.
-  shown as (
-    select distinct pg.fam, x.id
-      from page pg
-      join pairs pr on pr.fam = pg.fam
-     cross join lateral (values (pr.a), (pr.b)) x(id)
   )
-  select pg.fam,
+  select pg.key,
          (select jsonb_agg(jsonb_build_object(
                    'id', p.id,
                    'name', p.canonical_name,
@@ -566,12 +560,11 @@ begin
                                    join public.catalog_retailers r on r.id = l.retailer_id
                                   where l.product_id = p.id))
                  order by p.listing_count desc, p.canonical_name)
-            from shown sh
-            join public.catalog_products p on p.id = sh.id
-           where sh.fam = pg.fam),
+            from public.catalog_products p
+           where p.id in (pg.a, pg.b)),
          pg.total
     from page pg
-   order by pg.best desc, pg.fam;
+   order by pg.score desc, pg.key;
 end;
 $fn$;
 

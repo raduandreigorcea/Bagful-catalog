@@ -209,14 +209,15 @@ select throws_ok($$select public.catalog_admin_unmerge(gen_random_uuid())$$, '42
 insert into public.catalog_admins (user_id) values ('admin-1');
 set local request.jwt.claims = '{"sub":"admin-1"}';
 
-select is((select count(*)::int from public.catalog_admin_near_duplicates()), 1,
-  'the three Mountain Dew wordings are one candidate group, Pepsi none');
-select is((select jsonb_array_length(products) from public.catalog_admin_near_duplicates()), 3,
-  'with every product in it');
+-- a and b share a key (the cleanup's), so the pairs are a-c and b-c.
+select is((select count(*)::int from public.catalog_admin_near_duplicates()), 2,
+  'each Mountain Dew wording is a pair with the citrus one, Pepsi none');
+select ok((select bool_and(jsonb_array_length(products) = 2) from public.catalog_admin_near_duplicates()),
+  'a candidate is a pair, never a whole family');
 
 select public.catalog_admin_reject_group(array(select id from t_np where product in ('a', 'b', 'c')));
 select is((select count(*)::int from public.catalog_admin_near_duplicates()), 0,
-  'a group whose different pairs were all rejected is not asked again');
+  'a pair said to be different is not asked again');
 
 create temp table t_m as
 select public.catalog_admin_merge((select id from t_np where product = 'a'), (select id from t_np where product = 'b')) as id;
@@ -250,7 +251,7 @@ select is((select count(*)::int from public.catalog_admin_near_duplicates()), 2,
 select is((select array(select x->>'id' from jsonb_array_elements(d.products) x order by 1)
              from public.catalog_admin_near_duplicates() d where d.family like 'milka%'),
           array(select id::text from t_op where product in ('e', 'f') order by 1),
-  'a group shows only products paired in one country with a word in common');
+  'a pair is offered only in one country and with a word in common');
 select ok((select family from public.catalog_admin_near_duplicates() limit 1) like 'milka%',
   'the most alike pair comes first, not the smallest group');
 
