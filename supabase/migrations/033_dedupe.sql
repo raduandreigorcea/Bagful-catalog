@@ -378,6 +378,9 @@ language sql
 stable
 security definer
 set search_path = public
+-- 14 s on the live catalog. PostgREST applies a function's statement_timeout
+-- in place of the role's 8 s; the cleanup calls this once per 1000 groups.
+set statement_timeout = '120s'
 as $fn$
   with candidates as (
     select p.match_key
@@ -477,6 +480,8 @@ language plpgsql
 stable
 security definer
 set search_path = public
+-- 5.4 s on the live catalog, against an 8 s budget a scrape's cold cache can eat (020).
+set statement_timeout = '30s'
 as $fn$
 begin
   if not public.catalog_is_admin() then
