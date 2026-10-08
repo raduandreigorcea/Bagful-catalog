@@ -4,7 +4,7 @@
 -- break: a re-import that quietly duplicates, an earned popularity that quietly
 -- resets, a fuzzy merge that quietly puts two products in one row.
 begin;
-select plan(36);
+select plan(42);
 
 delete from public.catalog_listings;
 delete from public.catalog_identifiers;
@@ -216,6 +216,81 @@ select is(
   1, 'a malformed barcode drops the barcode, not the row');
 select is((select count(*)::int from public.catalog_identifiers where source = 'auchan' and identifier_value = 'nope'),
   0, 'and no rubbish identifier is stored');
+
+-- ─── 3b: the match key ───────────────────────────────────────────────────────
+-- Another shop's wording of a product already held lands on it; a variant word,
+-- a second listing from the same shop, or two candidates make a new product.
+select public.catalog_import_listings($j$[
+  {"external_id":"MD1","name":"Mountain Dew 1L","brand":"Mountain Dew","quantity":1,"unit":"l",
+   "product_url":"https://carrefour.ro/produse/md1","available":true}
+]$j$::jsonb, 'carrefour');
+select public.catalog_import_listings($j$[
+  {"external_id":"MD1","name":"Bautura carbogazoasa Mountain Dew, 1 l","brand":"Mountain Dew","quantity":1,"unit":"l",
+   "product_url":"https://www.auchan.ro/p/md1","available":true}
+]$j$::jsonb, 'auchan');
+select is((select count(*)::int from public.catalog_products where brand = 'Mountain Dew' and quantity = 1), 1,
+  'another shop''s wording of the same product lands on it');
+
+select public.catalog_import_listings($j$[
+  {"external_id":"MD2","name":"Mountain dew bautura racoritoare doza 250ml","brand":"Mountain Dew","quantity":250,"unit":"ml",
+   "product_url":"https://www.penny.ro/p/md2","available":true}
+]$j$::jsonb, 'penny');
+select public.catalog_import_listings($j$[
+  {"external_id":"MD3","name":"Bautura carbogazoasa Mountain Dew Pitch Black, 0.25 l","brand":"Mountain Dew","quantity":0.25,"unit":"l",
+   "product_url":"https://www.auchan.ro/p/md3","available":true}
+]$j$::jsonb, 'auchan');
+select is((select count(*)::int from public.catalog_products where brand = 'Mountain Dew' and quantity_unit is not null
+            and public.catalog_canonical_quantity(quantity, quantity_unit) = 'ml:250'), 2,
+  'a variant word makes a product of its own');
+
+-- Carrefour already holds the 1 L; a second Carrefour listing with the same
+-- words is a second product to Carrefour, so it is not attached.
+select public.catalog_import_listings($j$[
+  {"external_id":"MD4","name":"Bautura carbogazoasa Mountain Dew 1L","brand":"Mountain Dew","quantity":1,"unit":"l",
+   "product_url":"https://carrefour.ro/produse/md4","available":true}
+]$j$::jsonb, 'carrefour');
+select is((select count(*)::int from public.catalog_products where brand = 'Mountain Dew' and quantity = 1), 2,
+  'a shop''s second listing never joins its first');
+
+-- Two products now hold the 1 L key, so a third shop's wording is ambiguous.
+select public.catalog_import_listings($j$[
+  {"external_id":"MD5","name":"Bautura racoritoare carbogazoasa Mountain Dew 1 l","brand":"Mountain Dew","quantity":1,"unit":"l",
+   "product_url":"https://www.mega-image.ro/p/md5","available":true}
+]$j$::jsonb, 'mega-image');
+select is((select count(*)::int from public.catalog_products where brand = 'Mountain Dew' and quantity = 1), 3,
+  'an ambiguous match makes a new product rather than guess');
+
+-- Every holder counts, including the ones this shop already lists: two holders
+-- is ambiguous whoever lists them. (Review, 2026-10-08: the first version
+-- dropped the shop's own products BEFORE counting, so Carrefour's second Fanta
+-- wording landed on the one product it did not list.)
+select public.catalog_import_listings($j$[
+  {"external_id":"FA1","name":"Fanta Lamaie 0.5L","brand":"Fanta","quantity":0.5,"unit":"l",
+   "product_url":"https://www.auchan.ro/p/fa1","available":true},
+  {"external_id":"FA2","name":"Lamaie Fanta 0.5L","brand":"Fanta","quantity":0.5,"unit":"l",
+   "product_url":"https://www.auchan.ro/p/fa2","available":true}
+]$j$::jsonb, 'auchan');
+select public.catalog_import_listings($j$[
+  {"external_id":"FC1","name":"Fanta Lamaie 0.5 l","brand":"Fanta","quantity":0.5,"unit":"l",
+   "product_url":"https://carrefour.ro/produse/fc1","available":true},
+  {"external_id":"FC2","name":"Bautura carbogazoasa lamaie Fanta 0.5 l","brand":"Fanta","quantity":0.5,"unit":"l",
+   "product_url":"https://carrefour.ro/produse/fc2","available":true}
+]$j$::jsonb, 'carrefour');
+select is((select count(*)::int from public.catalog_products where brand = 'Fanta'), 3,
+  'two holders are ambiguous even when the shop lists one of them');
+
+-- A barcode the catalog does not know, arriving on a product that has a
+-- different one, is a different article: step 1 already said it is not theirs.
+select public.catalog_import_listings($j$[
+  {"external_id":"AQ1","name":"Apa Izvorul Alb 2L","brand":"Izvorul Alb","gtin":"5940000000011","quantity":2,"unit":"l",
+   "product_url":"https://www.auchan.ro/p/aq1","available":true}
+]$j$::jsonb, 'auchan');
+select public.catalog_import_listings($j$[
+  {"external_id":"AQ2","name":"Izvorul Alb Apa 2L","brand":"Izvorul Alb","gtin":"5940000000028","quantity":2,"unit":"l",
+   "product_url":"https://www.lidl.ro/p/aq2","available":true}
+]$j$::jsonb, 'lidl');
+select is((select count(*)::int from public.catalog_products where brand = 'Izvorul Alb'), 2,
+  'two different barcodes are two products');
 
 -- ─── the retailer must exist ─────────────────────────────────────────────────
 select throws_ok(

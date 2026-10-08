@@ -12,6 +12,7 @@
     "scrape:mega-image": "node --max-http-header-size=65536 --experimental-strip-types src/cli/scrape.ts mega-image",
     "scrape:all": "node --max-http-header-size=65536 --experimental-strip-types src/cli/scrape.ts all",
     "import": "node --experimental-strip-types src/cli/import.ts",
+    "dedupe": "node --experimental-strip-types src/cli/dedupe.ts",
     "test": "vitest run",
     "typecheck": "tsc -p . --noEmit",
     "db:reset": "supabase db reset",

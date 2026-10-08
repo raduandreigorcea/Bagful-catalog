@@ -58,6 +58,8 @@ declare
   v_by_listing  uuid;
   v_listing_id  uuid;
   v_key         text;
+  v_matches     int;
+  v_match_key   text;
   v_before      public.catalog_listings%rowtype;
   v_changed     boolean;
 
@@ -164,9 +166,39 @@ begin
         select p.id into v_product_id from public.catalog_products p where p.merge_key = v_key;
       end if;
 
+      -- 3b. The match key (033): the same words in another shop's order, with
+      --     a leading "Bautura carbogazoasa" left out. Attached only when:
+      --       * exactly ONE product holds the key, counting every holder (two
+      --         holders are a guess whoever lists them);
+      --       * this shop has no listing on it yet (a shop listing two things
+      --         means two products to that shop);
+      --       * it carries no barcode when this row brings one: step 1 already
+      --         found the row's barcode on nothing, so a product with another
+      --         barcode is another article.
+      --     Anything else makes a new product, as before.
+      if v_product_id is null then
+        v_match_key := public.catalog_match_key(v_brand, v_name, v_quantity, v_unit);
+        if v_match_key is not null then
+          select min(p.id::text)::uuid, count(*) into v_product_id, v_matches
+            from public.catalog_products p
+           where p.match_key = v_match_key;
+          if v_matches <> 1
+             or exists (
+               select 1 from public.catalog_listings l
+                where l.product_id = v_product_id and l.retailer_id = v_retailer_id)
+             or (v_gtin is not null and exists (
+               select 1 from public.catalog_identifiers i
+                where i.product_id = v_product_id and i.identifier_type = 'gtin'))
+          then
+            v_product_id := null;
+          end if;
+        end if;
+      end if;
+
       -- 4. Nothing matched, so this is a product the catalog has not held before.
       --    No fuzzy pass, no similarity threshold: two rows for one product is a
-      --    cosmetic problem, one row for two products is corrupt data.
+      --    cosmetic problem, one row for two products is corrupt data. 3b is not
+      --    fuzzy either: every word outside a short filler list must be equal.
       if v_product_id is null then
         insert into public.catalog_products
           (canonical_name, brand, quantity, quantity_unit, category)
