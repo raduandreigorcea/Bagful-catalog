@@ -88,7 +88,12 @@ begin
   end if;
 
   return query
-  with filtered as (
+  -- NOT MATERIALIZED: referenced twice, Postgres would otherwise build it once
+  -- in full, so the first page sorted all 183k products by hand (0.9 s warm,
+  -- 5.5 s cold on the live project). Inlined, the page walks
+  -- catalog_products_popularity and stops at 25, and the count is an index-only
+  -- scan: 58 ms.
+  with filtered as not materialized (
     -- One narrow row per matching product: all the count and the sort need.
     select p.id, p.popularity, p.canonical_name
       from public.catalog_products p
