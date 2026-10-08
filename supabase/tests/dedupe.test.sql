@@ -5,7 +5,7 @@
 -- variant word, a size, a pack, a missing brand. A key that merged too much
 -- would be silent corruption; one that merges too little is a duplicate row.
 begin;
-select plan(54);
+select plan(57);
 
 select is(public.catalog_match_key('Mountain Dew', 'Mountain Dew 1L', 1, 'l'),
           public.catalog_match_key('Mountain Dew', 'Bautura carbogazoasa Mountain Dew, 1 l', 1, 'l'),
@@ -193,6 +193,8 @@ select p.id, n.name, n.brand, 1, 'l' from t_n n join t_np p using (product);
 insert into public.catalog_listings (product_id, retailer_id, external_id, retailer_name, product_url)
 select p.id, r.id, n.external_id, n.name, 'https://example.ro/' || n.external_id
   from t_n n join t_np p using (product) join public.catalog_retailers r on r.slug = n.slug;
+-- The pairs are counted on a schedule (pg_cron, hourly), not per page load.
+select public.catalog_near_duplicates_refresh();
 
 -- Nobody: every door is locked.
 select throws_ok($$select * from public.catalog_admin_near_duplicates()$$, '42501', null,
@@ -246,6 +248,10 @@ insert into public.catalog_listings (product_id, retailer_id, external_id, retai
 select p.id, r.id, o.external_id, o.name, 'https://example.ro/' || o.external_id
   from t_o o join t_op p using (product) join public.catalog_retailers r on r.slug = o.slug;
 
+select is((select count(*)::int from public.catalog_admin_near_duplicates()), 0,
+  'products added since the last count wait for the next one');
+select public.catalog_near_duplicates_refresh();
+
 select is((select count(*)::int from public.catalog_admin_near_duplicates()), 2,
   'Oreo and Milka are candidates, the rejected Mountain Dew is not');
 select is((select array(select x->>'id' from jsonb_array_elements(d.products) x order by 1)
@@ -254,6 +260,12 @@ select is((select array(select x->>'id' from jsonb_array_elements(d.products) x 
   'a pair is offered only in one country and with a word in common');
 select ok((select family from public.catalog_admin_near_duplicates() limit 1) like 'milka%',
   'the most alike pair comes first, not the smallest group');
+
+select public.catalog_admin_merge((select id from t_op where product = 'e'), (select id from t_op where product = 'f'));
+select is((select count(*)::int from public.catalog_admin_near_duplicates()), 1,
+  'a merged pair is gone at once, without waiting for the next count');
+select ok(not has_function_privilege('authenticated', 'public.catalog_near_duplicates_refresh()', 'execute'),
+  'counting the pairs is not a client function');
 
 -- ─── the guards review asked for (2026-10-08) ────────────────────────────────
 reset request.jwt.claims;

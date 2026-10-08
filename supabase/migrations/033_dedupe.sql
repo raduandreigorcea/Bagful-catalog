@@ -474,19 +474,50 @@ revoke all on function public.catalog_match_family(text) from public, anon, auth
 create index if not exists catalog_products_match_family_idx
   on public.catalog_products (public.catalog_match_family(match_key)) where match_key is not null;
 
-create or replace function public.catalog_admin_near_duplicates(p_limit int default 25, p_offset int default 0)
-returns table (family text, products jsonb, total bigint)
+-- The pairs, counted on a schedule. Counting them reads every family of the
+-- catalog and took 9 to 15 s on the live project: past the 8 s a request gets,
+-- and too long to wait for on every page of the Duplicates page. pg_cron runs
+-- this as postgres, outside any request budget, the way 020 counts the stats.
+-- What a person decides shows at once anyway: a merge deletes the dropped
+-- product and the foreign keys take its pairs with it, and "different" deletes
+-- the pair. So the page reads the first 25 by rank and a count, never all
+-- 70,000. Only NEW pairs wait, for the next hour.
+create table if not exists public.catalog_near_duplicate_pairs (
+  a     uuid not null,
+  b     uuid not null,
+  fam   text not null,
+  score numeric not null,
+  primary key (a, b)
+);
+
+create index if not exists catalog_near_duplicate_pairs_rank
+  on public.catalog_near_duplicate_pairs (score desc, fam, a, b);
+-- For the cascade from b's side; the primary key serves a's.
+create index if not exists catalog_near_duplicate_pairs_b
+  on public.catalog_near_duplicate_pairs (b);
+
+-- Restated below the table so they reach a database where it already exists.
+alter table public.catalog_near_duplicate_pairs drop constraint if exists catalog_near_duplicate_pairs_a_fkey;
+alter table public.catalog_near_duplicate_pairs add constraint catalog_near_duplicate_pairs_a_fkey
+  foreign key (a) references public.catalog_products (id) on delete cascade;
+alter table public.catalog_near_duplicate_pairs drop constraint if exists catalog_near_duplicate_pairs_b_fkey;
+alter table public.catalog_near_duplicate_pairs add constraint catalog_near_duplicate_pairs_b_fkey
+  foreign key (b) references public.catalog_products (id) on delete cascade;
+
+alter table public.catalog_near_duplicate_pairs enable row level security;
+revoke all on public.catalog_near_duplicate_pairs from anon, authenticated;
+
+comment on table public.catalog_near_duplicate_pairs is
+  'Near-duplicate pairs as of the last catalog_near_duplicates_refresh(). Read by catalog_admin_near_duplicates.';
+
+create or replace function public.catalog_near_duplicates_refresh()
+returns void
 language plpgsql
-stable
 security definer
 set search_path = public
--- ~9 s on the live catalog, past the 8 s budget a request gets (020).
-set statement_timeout = '30s'
 as $fn$
 begin
-  if not public.catalog_is_admin() then
-    raise exception 'not an admin' using errcode = '42501';
-  end if;
+  delete from public.catalog_near_duplicate_pairs;
 
   -- Set-based, not a correlated check per pair: the live catalog has ~18,500
   -- families with more than one set of words, the largest 257 products, so about
@@ -500,7 +531,7 @@ begin
   -- nothing in common. The exception is a name that is only brand and size
   -- ("Mountain Dew 1L"): it has no words to share, and it is exactly what Mega
   -- Image's "cu gust de citrice" is. Those come last.
-  return query
+  insert into public.catalog_near_duplicate_pairs (a, b, fam, score)
   with fams as (
     select public.catalog_match_family(p.match_key) as fam
       from public.catalog_products p
@@ -538,18 +569,49 @@ begin
        select 1 from public.catalog_merge_rejections r
         where r.product_a = x.id and r.product_b = y.id
      )
-  ),
+  )
+  select p.a, p.b, p.fam, p.score from pairs p;
+end;
+$fn$;
+
+comment on function public.catalog_near_duplicates_refresh() is
+  'Recount catalog_near_duplicate_pairs. Hourly by pg_cron.';
+
+revoke all on function public.catalog_near_duplicates_refresh() from public, anon, authenticated;
+grant execute on function public.catalog_near_duplicates_refresh() to service_role;
+
+-- Hourly, off the hour the stats count takes (020). cron.schedule replaces a job
+-- of the same name, so re-running this file does not stack a second one.
+select cron.schedule('catalog-near-duplicates-refresh', '7 * * * *', $$select public.catalog_near_duplicates_refresh()$$);
+
+-- Filled now, so the page has pairs before the first scheduled count.
+select public.catalog_near_duplicates_refresh();
+
+create or replace function public.catalog_admin_near_duplicates(p_limit int default 25, p_offset int default 0)
+returns table (family text, products jsonb, total bigint)
+language plpgsql
+stable
+security definer
+set search_path = public
+as $fn$
+begin
+  if not public.catalog_is_admin() then
+    raise exception 'not an admin' using errcode = '42501';
+  end if;
+
   -- PAIRS, not families: words like "balsam" and "par" chain every Pantene 160 ml
   -- into one family of 22, which nobody can decide on. Most alike first, so a
   -- person's time goes to the likeliest merges and the doubtful ones sink.
   -- `family` keeps the family in front, then the pair, so it is unique per row.
-  page as (
-    select p.fam || '|' || p.a || '|' || p.b as key, p.a, p.b, p.score, count(*) over () as total
-      from pairs p
-     order by p.score desc, p.fam, p.a, p.b
+  return query
+  with page as (
+    select c.a, c.b, c.fam, c.score,
+           (select count(*) from public.catalog_near_duplicate_pairs) as total
+      from public.catalog_near_duplicate_pairs c
+     order by c.score desc, c.fam, c.a, c.b
      limit greatest(1, least(coalesce(p_limit, 25), 100)) offset greatest(0, coalesce(p_offset, 0))
   )
-  select pg.key,
+  select pg.fam || '|' || pg.a || '|' || pg.b,
          (select jsonb_agg(jsonb_build_object(
                    'id', p.id,
                    'name', p.canonical_name,
@@ -564,12 +626,12 @@ begin
            where p.id in (pg.a, pg.b)),
          pg.total
     from page pg
-   order by pg.score desc, pg.key;
+   order by pg.score desc, pg.fam, pg.a, pg.b;
 end;
 $fn$;
 
 comment on function public.catalog_admin_near_duplicates(int, int) is
-  'Groups of one brand, size and pack with more than one set of words, and a pair no shop lists twice and nobody rejected.';
+  'Near-duplicate pairs from the last hourly count, minus any merged away or rejected since. Most alike first.';
 
 create or replace function public.catalog_admin_merge(p_keep uuid, p_drop uuid)
 returns uuid
@@ -603,6 +665,9 @@ begin
     from unnest(p_ids) as a, unnest(p_ids) as b
    where a < b
   on conflict do nothing;
+  -- And off the Duplicates page now, not at the next hourly count.
+  delete from public.catalog_near_duplicate_pairs c
+   where c.a = any (p_ids) and c.b = any (p_ids);
 end;
 $fn$;
 
