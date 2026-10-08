@@ -480,7 +480,7 @@ language plpgsql
 stable
 security definer
 set search_path = public
--- 5.4 s on the live catalog, against an 8 s budget a scrape's cold cache can eat (020).
+-- ~9 s on the live catalog, past the 8 s budget a request gets (020).
 set statement_timeout = '30s'
 as $fn$
 begin
@@ -493,6 +493,13 @@ begin
   -- a million pairs. Each product's shops are gathered ONCE and a pair compares
   -- two arrays; asked per pair through the listings, the first version ran for
   -- over ten minutes on a copy of the live data.
+  --
+  -- A pair is offered only when its products share a country and a word (the
+  -- key's words, brand already out). Without those, 6,251 groups on the live
+  -- catalog, mostly a Spanish name against a French one or two flavours with
+  -- nothing in common. The exception is a name that is only brand and size
+  -- ("Mountain Dew 1L"): it has no words to share, and it is exactly what Mega
+  -- Image's "cu gust de citrice" is. Those come last.
   return query
   with fams as (
     select public.catalog_match_family(p.match_key) as fam
@@ -503,34 +510,50 @@ begin
   ),
   members as (
     select p.id, p.match_key, f.fam,
-           coalesce((select array_agg(l.retailer_id) from public.catalog_listings l where l.product_id = p.id), '{}') as shops
+           string_to_array(split_part(p.match_key, '|', 2), ' ') as words,
+           coalesce((select array_agg(l.retailer_id) from public.catalog_listings l where l.product_id = p.id), '{}') as shops,
+           coalesce((select array_agg(distinct r.country)
+                       from public.catalog_listings l
+                       join public.catalog_retailers r on r.id = l.retailer_id
+                      where l.product_id = p.id), '{}') as countries
       from fams f
       join public.catalog_products p
         on p.match_key is not null
        and public.catalog_match_family(p.match_key) = f.fam
   ),
-  open_fams as (
-    select distinct x.fam
+  pairs as (
+    select x.fam, x.id as a, y.id as b,
+           -- Shared words over all words: 1 is the same words in another order.
+           (select count(*) from unnest(x.words) w where w = any(y.words))::numeric
+             / greatest(1, (select count(distinct w) from unnest(x.words || y.words) w)) as score
       from members x
       join members y
         on y.fam = x.fam
        and x.id < y.id
        and x.match_key <> y.match_key
        and not (x.shops && y.shops)
+       and x.countries && y.countries
+       and (x.words && y.words or cardinality(x.words) = 0 or cardinality(y.words) = 0)
      where not exists (
        select 1 from public.catalog_merge_rejections r
         where r.product_a = x.id and r.product_b = y.id
      )
   ),
-  -- Smallest groups first: two or three wordings of one size are usually one
-  -- product, while a family of twenty (every John West tin of 80 g) is mostly
-  -- flavours, and a person's time is better spent on the first kind.
+  -- Most alike first: a person's time goes to the likeliest merges, and the
+  -- doubtful ones sink to the last pages.
   page as (
-    select o.fam, count(*) over () as total, s.size
-      from open_fams o
-      join (select m.fam, count(*) as size from members m group by m.fam) s on s.fam = o.fam
-     order by s.size, o.fam
+    select p.fam, max(p.score) as best, count(*) over () as total
+      from pairs p
+     group by p.fam
+     order by max(p.score) desc, p.fam
      limit greatest(1, least(coalesce(p_limit, 25), 100)) offset greatest(0, coalesce(p_offset, 0))
+  ),
+  -- Only products in an offered pair: the rest of the family is not a question.
+  shown as (
+    select distinct pg.fam, x.id
+      from page pg
+      join pairs pr on pr.fam = pg.fam
+     cross join lateral (values (pr.a), (pr.b)) x(id)
   )
   select pg.fam,
          (select jsonb_agg(jsonb_build_object(
@@ -543,12 +566,12 @@ begin
                                    join public.catalog_retailers r on r.id = l.retailer_id
                                   where l.product_id = p.id))
                  order by p.listing_count desc, p.canonical_name)
-            from public.catalog_products p
-           where p.match_key is not null
-             and public.catalog_match_family(p.match_key) = pg.fam),
+            from shown sh
+            join public.catalog_products p on p.id = sh.id
+           where sh.fam = pg.fam),
          pg.total
     from page pg
-   order by pg.size, pg.fam;
+   order by pg.best desc, pg.fam;
 end;
 $fn$;
 
