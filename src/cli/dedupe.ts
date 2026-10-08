@@ -25,6 +25,9 @@ interface Group {
 
 // PostgREST caps a response at 1000 rows, an RPC's included.
 const PAGE = 1000
+// Keys filled per call. Each call must finish inside the API's 8 s statement
+// timeout; 5000 did locally and did not on the live project mid-import.
+const KEY_BATCH = 1000
 
 async function main(): Promise<void> {
   loadEnvFiles()
@@ -37,11 +40,11 @@ async function main(): Promise<void> {
   // it too; it decides nothing. After the first run every batch is a no-op.
   let filled = 0
   for (let after: string | null = null; ; ) {
-    const { data, error } = await db.rpc('catalog_backfill_match_keys', { p_after: after, p_limit: 5000 })
+    const { data, error } = await db.rpc('catalog_backfill_match_keys', { p_after: after, p_limit: KEY_BATCH })
     if (error) throw new Error(`catalog_backfill_match_keys: ${error.message}`)
     if (data === null) break
     after = data as string
-    filled += 5000
+    filled += KEY_BATCH
     if (filled % 50000 === 0) console.error(`keyed ${filled} products...`)
   }
 
