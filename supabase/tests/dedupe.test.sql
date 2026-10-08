@@ -5,7 +5,7 @@
 -- variant word, a size, a pack, a missing brand. A key that merged too much
 -- would be silent corruption; one that merges too little is a duplicate row.
 begin;
-select plan(51);
+select plan(54);
 
 select is(public.catalog_match_key('Mountain Dew', 'Mountain Dew 1L', 1, 'l'),
           public.catalog_match_key('Mountain Dew', 'Bautura carbogazoasa Mountain Dew, 1 l', 1, 'l'),
@@ -209,14 +209,15 @@ select throws_ok($$select public.catalog_admin_unmerge(gen_random_uuid())$$, '42
 insert into public.catalog_admins (user_id) values ('admin-1');
 set local request.jwt.claims = '{"sub":"admin-1"}';
 
-select is((select count(*)::int from public.catalog_admin_near_duplicates()), 1,
-  'the three Mountain Dew wordings are one candidate group, Pepsi none');
-select is((select jsonb_array_length(products) from public.catalog_admin_near_duplicates()), 3,
-  'with every product in it');
+-- a and b share a key (the cleanup's), so the pairs are a-c and b-c.
+select is((select count(*)::int from public.catalog_admin_near_duplicates()), 2,
+  'each Mountain Dew wording is a pair with the citrus one, Pepsi none');
+select ok((select bool_and(jsonb_array_length(products) = 2) from public.catalog_admin_near_duplicates()),
+  'a candidate is a pair, never a whole family');
 
 select public.catalog_admin_reject_group(array(select id from t_np where product in ('a', 'b', 'c')));
 select is((select count(*)::int from public.catalog_admin_near_duplicates()), 0,
-  'a group whose different pairs were all rejected is not asked again');
+  'a pair said to be different is not asked again');
 
 create temp table t_m as
 select public.catalog_admin_merge((select id from t_np where product = 'a'), (select id from t_np where product = 'b')) as id;
@@ -224,6 +225,35 @@ select is((select source || ' ' || merged_by from public.catalog_admin_merges() 
   'admin admin-1', 'an admin merge is recorded as theirs');
 select lives_ok($$select public.catalog_admin_unmerge((select id from t_m))$$,
   'and an admin can undo it');
+
+-- What a person is shown, measured on the live catalog the day it opened
+-- (2026-10-08): pairs with no word in common and pairs from two countries were
+-- most of the 6,251 groups, and alphabetical order buried the real ones.
+create temp table t_o (slug text, external_id text, product text, name text, brand text, qty numeric);
+insert into t_o values
+  ('kaufland', 'O1', 'e', 'Ciocolata cu alune Milka 100g',             'Milka', 100),
+  ('lidl',     'O2', 'f', 'Ciocolata cu alune intregi Milka 100g',     'Milka', 100),
+  -- no word in common with e or f
+  ('penny',    'O3', 'g', 'Biscuiti Milka 100g',                       'Milka', 100),
+  -- France: never offered against a Romanian shop
+  ('aldi-fr',  'O4', 'h', 'Ciocolata alune noisettes Milka 100g',      'Milka', 100),
+  ('kaufland', 'O5', 'i', 'Biscuiti Oreo cu crema de vanilie 154g',    'Oreo',  154),
+  ('lidl',     'O6', 'j', 'Biscuiti Oreo original 154g',              'Oreo',  154);
+create temp table t_op as select product, gen_random_uuid() as id from t_o;
+insert into public.catalog_products (id, canonical_name, brand, quantity, quantity_unit)
+select p.id, o.name, o.brand, o.qty, 'g' from t_o o join t_op p using (product);
+insert into public.catalog_listings (product_id, retailer_id, external_id, retailer_name, product_url)
+select p.id, r.id, o.external_id, o.name, 'https://example.ro/' || o.external_id
+  from t_o o join t_op p using (product) join public.catalog_retailers r on r.slug = o.slug;
+
+select is((select count(*)::int from public.catalog_admin_near_duplicates()), 2,
+  'Oreo and Milka are candidates, the rejected Mountain Dew is not');
+select is((select array(select x->>'id' from jsonb_array_elements(d.products) x order by 1)
+             from public.catalog_admin_near_duplicates() d where d.family like 'milka%'),
+          array(select id::text from t_op where product in ('e', 'f') order by 1),
+  'a pair is offered only in one country and with a word in common');
+select ok((select family from public.catalog_admin_near_duplicates() limit 1) like 'milka%',
+  'the most alike pair comes first, not the smallest group');
 
 -- ─── the guards review asked for (2026-10-08) ────────────────────────────────
 reset request.jwt.claims;
