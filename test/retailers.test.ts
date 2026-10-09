@@ -5,7 +5,7 @@
 // re-capturing the fixture makes this suite fail with the reason rather than
 // leaving a scheduled run to quietly report zero products at 3am.
 
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { readFixture, fixtureFetch, callsOf, collect, testLogger } from './helpers.ts'
 import { toRetailerProduct, parseResourcesHeader, categoryOf } from '../src/retailers/auchan/vtex.ts'
 import type { VtexProduct } from '../src/retailers/auchan/vtex.ts'
@@ -26,6 +26,19 @@ import { extractJsonLd, findProduct, readProduct } from '../src/core/jsonld.ts'
 // ─── Auchan ──────────────────────────────────────────────────────────────────
 
 const auchanPage = JSON.parse(readFixture('auchan/products-search.json')) as VtexProduct[]
+
+/** Drain a crawl whose backoff and circuit cooldowns would take real minutes. */
+async function collectOnFakeClock<T>(source: AsyncGenerator<T>): Promise<T[]> {
+  vi.useFakeTimers()
+  try {
+    let done = false
+    const run = collect(source).finally(() => (done = true))
+    while (!done) await vi.advanceTimersByTimeAsync(10_000)
+    return await run
+  } finally {
+    vi.useRealTimers()
+  }
+}
 
 describe('auchan / VTEX', () => {
   it('reads a real API page', () => {
@@ -102,10 +115,11 @@ describe('auchan / VTEX', () => {
     // reaching the breaker takes more requests than a crawl that dies on its
     // first page, and a crawl that dies on its first page is caught by finding
     // nothing rather than by this.
-    const tree = JSON.stringify([
-      { id: 1000000, name: 'A', children: [{ id: 1010000, name: 'B' }] },
-      { id: 2000000, name: 'C', children: [{ id: 2010000, name: 'D' }] },
-    ])
+    // Enough categories to outlast every pause: each trip of the breaker is
+    // waited out, and only the fifth in a row ends the crawl.
+    const tree = JSON.stringify(
+      [1, 2, 3, 4, 5].map((n) => ({ id: n * 1000000, name: `T${n}`, children: [{ id: n * 1000000 + 10000, name: `L${n}` }] })),
+    )
     const reasons: string[] = []
     const fetchImpl = (async (input: RequestInfo | URL) => {
       const url = String(input)
@@ -114,14 +128,14 @@ describe('auchan / VTEX', () => {
       throw new Error('connection reset')
     }) as unknown as typeof fetch
 
-    await collect(
+    // It pauses through every five-minute cooldown first, on a fake clock.
+    await collectOnFakeClock(
       new AuchanScraper().discoverProducts({
         log: testLogger(),
         fetchImpl,
         minIntervalMs: 0,
         reportIncomplete: (reason) => void reasons.push(reason),
       }),
-      50,
     )
     expect(reasons.some((r) => r.includes('circuit'))).toBe(true)
   })
@@ -206,6 +220,33 @@ describe('auchan / VTEX', () => {
     expect(products.length).toBe(5)
     expect(log.lines.some((l) => l.message.includes('category tree unavailable'))).toBe(true)
     expect(callsOf(fetchImpl).some((u) => u.includes('/products/search'))).toBe(true)
+  })
+
+  it('waits out an open circuit instead of ending the crawl', async () => {
+    // 2026-10-08: a short burst of 500s opened the breaker and the run failed
+    // with most of the shop unread. Six in a row is what trips it here.
+    let failures = 6
+    const fetchImpl = (async (input: RequestInfo | URL) => {
+      const url = String(input)
+      if (url.includes('/robots.txt')) return new Response(readFixture('auchan/robots.txt'))
+      if (url.includes('/category/tree')) return new Response('[{"id":1},{"id":2}]')
+      if (failures-- > 0) return new Response('', { status: 500 })
+      return new Response(readFixture('auchan/products-search.json'), { headers: { resources: '0-49/50' } })
+    }) as unknown as typeof fetch
+    const incomplete: string[] = []
+    const log = testLogger()
+    const products = await collectOnFakeClock(
+      new AuchanScraper().discoverProducts({
+        log,
+        fetchImpl,
+        minIntervalMs: 0,
+        reportIncomplete: (reason: string) => void incomplete.push(reason),
+      }),
+    )
+
+    expect(log.lines.some((l) => l.message.includes('circuit open, pausing'))).toBe(true)
+    expect(incomplete).toEqual([])
+    expect(products.length).toBeGreaterThan(0)
   })
 })
 

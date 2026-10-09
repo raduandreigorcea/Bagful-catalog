@@ -49,6 +49,8 @@ const API = `${ORIGIN}/api/catalog_system/pub`
 const PAGE = 50
 /** VTEX's own limit, not ours. */
 const MAX_OFFSET = 2500
+/** Circuit trips in a row, with no page answering between them, that end a crawl. */
+const CIRCUIT_TRIPS_TO_END = 5
 
 interface TreeNode {
   id?: number
@@ -115,12 +117,33 @@ export class AuchanScraper implements RetailerScraper {
       }
     }
 
+    // A circuit that opens is a PAUSE, not the end of the crawl, as in
+    // core/pageCrawl.ts. Auchan's search API answers 500 in short bursts: on
+    // 2026-10-08 two such pages opened the breaker, and every category still
+    // queued (771 of them) was refused in the same four seconds, so the run
+    // failed at 20,304 of ~60,000 products. Wait out the cooldown and ask
+    // again; only a shop that keeps refusing through every pause ends the run.
+    let trips = 0
+    const get = async (url: string) => {
+      for (;;) {
+        try {
+          const response = await http.get(url)
+          trips = 0
+          return response
+        } catch (error) {
+          if (!(error instanceof CircuitOpenError) || ++trips >= CIRCUIT_TRIPS_TO_END) throw error
+          ctx.log.warn('auchan circuit open, pausing', { trip: trips, reason: error.message })
+          await http.waitOutCircuit(url)
+        }
+      }
+    }
+
     for (const path of await this.seedFromTree(http, ctx)) enqueue(path)
 
     // The unfiltered first slice, which both yields products and seeds the
     // frontier with every category those products belong to. This is what makes
     // the crawl work with no tree at all.
-    for await (const product of this.page(http, ctx, null, seenProducts, enqueue)) {
+    for await (const product of this.page(get, ctx, null, seenProducts, enqueue)) {
       yield product
       if (ctx.limit && ++emitted >= ctx.limit) return
     }
@@ -135,7 +158,7 @@ export class AuchanScraper implements RetailerScraper {
     while (frontier.length > 0) {
       if (ctx.signal?.aborted) return
       const path = frontier.shift() as string
-      for await (const product of this.page(http, ctx, path, seenProducts, enqueue)) {
+      for await (const product of this.page(get, ctx, path, seenProducts, enqueue)) {
         yield product
         if (ctx.limit && ++emitted >= ctx.limit) return
       }
@@ -190,7 +213,7 @@ export class AuchanScraper implements RetailerScraper {
    * which the products themselves have just told us about, to cover the rest.
    */
   private async *page(
-    http: HttpClient,
+    get: (url: string) => ReturnType<HttpClient['get']>,
     ctx: ScrapeContext,
     categoryPath: string | null,
     seen: Set<string>,
@@ -209,7 +232,7 @@ export class AuchanScraper implements RetailerScraper {
 
       let response
       try {
-        response = await http.get(url)
+        response = await get(url)
       } catch (error) {
         if (error instanceof CircuitOpenError) {
           // The host has stopped answering. Ending the generator lets the run
