@@ -160,6 +160,8 @@ jobs:
           - picard
           - morrisons
           - condis
+          - knuspr-de
+          - gurkerl-at
     timeout-minutes: 300
     steps:
       - uses: actions/checkout@v7
@@ -185,8 +187,9 @@ jobs:
           # read red, and never closed. A third is ~3 hours for either. The slice
           # rotates by day of the year, so every product is refreshed every third
           # night, and the run closes as a deliberate partial. The price is the
-          # same as Carrefour Romania's: these two never sweep.
-          SCRAPE_SLICES: ${{ (matrix.retailer == 'carrefour-it' || matrix.retailer == 'delhaize') && '3' || '' }}
+          # same as Carrefour Romania's: these two never sweep. Knuspr and Gurkerl
+          # (~16k pages of ~500 KB each) are read in HALVES for the same reason.
+          SCRAPE_SLICES: ${{ (matrix.retailer == 'carrefour-it' || matrix.retailer == 'delhaize') && '3' || (matrix.retailer == 'knuspr-de' || matrix.retailer == 'gurkerl-at') && '2' || '' }}
         run: |
           if [ -n "$SCRAPE_SLICES" ]; then
             set -- --shard "$(( 10#$(date -u +%j) % SCRAPE_SLICES + 1 ))/$SCRAPE_SLICES"
