@@ -162,6 +162,7 @@ jobs:
           - condis
           - knuspr-de
           - gurkerl-at
+          - ahorramas
     timeout-minutes: 300
     steps:
       - uses: actions/checkout@v7

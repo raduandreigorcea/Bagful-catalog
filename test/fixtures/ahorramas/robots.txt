@@ -1,0 +1,12 @@
+User-agent: *
+Disallow: *&prefn1*
+Disallow: *?pmax*
+Disallow: */login*
+Disallow: /cart*
+Disallow: /buscador?*
+Disallow: /on/demandware.store/Sites-Ahorramas-Site/es/Search-ShowAjax*
+Disallow: /on/demandware.store/Sites-Ahorramas-Site/es/Product-Variation*
+Disallow: *ver-todo*
+Disallow: *informacion-ahorramas.html*
+
+Sitemap: https://www.ahorramas.com/sitemap_index.xml

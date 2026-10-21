@@ -32,6 +32,7 @@ import { picard } from '../retailers/picard/index.ts'
 import { morrisons } from '../retailers/morrisons/index.ts'
 import { condis } from '../retailers/condis/index.ts'
 import { ROHLIK_SCRAPERS } from '../retailers/rohlik/index.ts'
+import { ahorramas } from '../retailers/ahorramas/index.ts'
 
 /** A retailer that has been looked at and cannot currently be read. */
 class UnimplementedScraper implements RetailerScraper {
@@ -105,6 +106,7 @@ export const SCRAPERS: RetailerScraper[] = [
   morrisons,
   condis,
   ...ROHLIK_SCRAPERS,
+  ahorramas,
   diaEs,
 ]
 
