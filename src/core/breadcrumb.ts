@@ -20,7 +20,9 @@ function collect(node: unknown, out: string[]): void {
     )
     for (const item of items) {
       const target = item?.['item']
-      const href = typeof target === 'string' ? target : (target as Record<string, unknown> | null)?.['@id']
+      // An object target names its address as @id (the spec) or as id (Ahorramas).
+      const node = target as Record<string, unknown> | null
+      const href = typeof target === 'string' ? target : (node?.['@id'] ?? node?.['id'])
       if (typeof href === 'string') out.push(href)
     }
     return
