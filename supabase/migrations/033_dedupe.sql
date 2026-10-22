@@ -510,82 +510,12 @@ revoke all on public.catalog_near_duplicate_pairs from anon, authenticated;
 comment on table public.catalog_near_duplicate_pairs is
   'Near-duplicate pairs as of the last catalog_near_duplicates_refresh(). Read by catalog_admin_near_duplicates.';
 
-create or replace function public.catalog_near_duplicates_refresh()
-returns void
-language plpgsql
-security definer
-set search_path = public
-as $fn$
-begin
-  delete from public.catalog_near_duplicate_pairs;
-
-  -- Set-based, not a correlated check per pair: the live catalog has ~18,500
-  -- families with more than one set of words, the largest 257 products, so about
-  -- a million pairs. Each product's shops are gathered ONCE and a pair compares
-  -- two arrays; asked per pair through the listings, the first version ran for
-  -- over ten minutes on a copy of the live data.
-  --
-  -- A pair is offered only when its products share a country and a word (the
-  -- key's words, brand already out). Without those, 6,251 groups on the live
-  -- catalog, mostly a Spanish name against a French one or two flavours with
-  -- nothing in common. The exception is a name that is only brand and size
-  -- ("Mountain Dew 1L"): it has no words to share, and it is exactly what Mega
-  -- Image's "cu gust de citrice" is. Those come last.
-  insert into public.catalog_near_duplicate_pairs (a, b, fam, score)
-  with fams as (
-    select public.catalog_match_family(p.match_key) as fam
-      from public.catalog_products p
-     where p.match_key is not null
-     group by 1
-    having count(distinct p.match_key) > 1
-  ),
-  members as (
-    select p.id, p.match_key, f.fam,
-           string_to_array(split_part(p.match_key, '|', 2), ' ') as words,
-           coalesce((select array_agg(l.retailer_id) from public.catalog_listings l where l.product_id = p.id), '{}') as shops,
-           coalesce((select array_agg(distinct r.country)
-                       from public.catalog_listings l
-                       join public.catalog_retailers r on r.id = l.retailer_id
-                      where l.product_id = p.id), '{}') as countries
-      from fams f
-      join public.catalog_products p
-        on p.match_key is not null
-       and public.catalog_match_family(p.match_key) = f.fam
-  ),
-  pairs as (
-    select x.fam, x.id as a, y.id as b,
-           -- Shared words over all words: 1 is the same words in another order.
-           (select count(*) from unnest(x.words) w where w = any(y.words))::numeric
-             / greatest(1, (select count(distinct w) from unnest(x.words || y.words) w)) as score
-      from members x
-      join members y
-        on y.fam = x.fam
-       and x.id < y.id
-       and x.match_key <> y.match_key
-       and not (x.shops && y.shops)
-       and x.countries && y.countries
-       and (x.words && y.words or cardinality(x.words) = 0 or cardinality(y.words) = 0)
-     where not exists (
-       select 1 from public.catalog_merge_rejections r
-        where r.product_a = x.id and r.product_b = y.id
-     )
-  )
-  select p.a, p.b, p.fam, p.score from pairs p;
-end;
-$fn$;
-
-comment on function public.catalog_near_duplicates_refresh() is
-  'Recount catalog_near_duplicate_pairs. Hourly by pg_cron.';
-
-revoke all on function public.catalog_near_duplicates_refresh() from public, anon, authenticated;
-grant execute on function public.catalog_near_duplicates_refresh() to service_role;
+-- catalog_near_duplicates_refresh LIVES IN 038, ALONE (it was here; 038 keeps fewer pairs).
 
 -- Hourly, off the hour the stats count takes (020). cron.schedule replaces a job
 -- of the same name, so re-running this file does not stack a second one.
 select cron.schedule('catalog-near-duplicates-refresh', '7 * * * *', $$select public.catalog_near_duplicates_refresh()$$);
 
--- Filled now, so the page has pairs before the first scheduled count.
-select public.catalog_near_duplicates_refresh();
 
 create or replace function public.catalog_admin_near_duplicates(p_limit int default 25, p_offset int default 0)
 returns table (family text, products jsonb, total bigint)
