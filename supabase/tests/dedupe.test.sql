@@ -239,7 +239,9 @@ insert into t_o values
   ('penny',    'O3', 'g', 'Biscuiti Milka 100g',                       'Milka', 100),
   -- France: never offered against a Romanian shop
   ('aldi-fr',  'O4', 'h', 'Ciocolata alune noisettes Milka 100g',      'Milka', 100),
-  ('kaufland', 'O5', 'i', 'Biscuiti Oreo cu crema de vanilie 154g',    'Oreo',  154),
+  -- Two words of three in common (0.67). It used to read 'cu crema de vanilie',
+  -- which is a different biscuit and scores 0.17: 038 keeps only pairs from 0.5 up.
+  ('kaufland', 'O5', 'i', 'Biscuiti Oreo original crema 154g',        'Oreo',  154),
   ('lidl',     'O6', 'j', 'Biscuiti Oreo original 154g',              'Oreo',  154);
 create temp table t_op as select product, gen_random_uuid() as id from t_o;
 insert into public.catalog_products (id, canonical_name, brand, quantity, quantity_unit)
