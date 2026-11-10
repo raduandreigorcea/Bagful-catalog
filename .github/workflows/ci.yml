@@ -30,9 +30,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+      # Pinned, as in the app's CI: `latest` became 3.1.0 on 2026-11-10, which
+      # refuses config.toml's [inbucket] section and failed this job before a test ran.
       - uses: supabase/setup-cli@v3
         with:
-          version: latest
+          version: 2.109.1
       - run: supabase db start
       # `db start` restores from a local backup where one exists and SKIPS the
       # migrations. A cold runner has no backup so this job would get away with
