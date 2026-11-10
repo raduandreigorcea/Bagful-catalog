@@ -494,10 +494,8 @@ create trigger catalog_products_blob_insert
   after insert on public.catalog_products
   for each row execute function public.catalog_products_refresh_blob();
 
-drop trigger if exists catalog_products_blob_rename on public.catalog_products;
-create trigger catalog_products_blob_rename
-  after update of canonical_name, brand on public.catalog_products
-  for each row execute function public.catalog_products_refresh_blob();
+-- catalog_products_blob_rename is created in 039, which fires it only when the
+-- name or brand actually changes.
 
 -- ─── listing_count, and the blob that follows a listing ──────────────────────
 -- Maintained by a trigger, not by the importer. An import that fails halfway
@@ -528,10 +526,9 @@ begin
 end;
 $fn$;
 
-drop trigger if exists catalog_listings_after_change on public.catalog_listings;
-create trigger catalog_listings_after_change
-  after insert or delete or update of product_id, retailer_name on public.catalog_listings
-  for each row execute function public.catalog_listings_after_change();
+-- Its triggers are created in 039: catalog_listings_after_change on insert and
+-- delete, catalog_listings_after_relink on an update that changes product_id or
+-- retailer_name. Declared here, they fired on every import row (039).
 
 create or replace function public.catalog_touch_updated_at()
 returns trigger

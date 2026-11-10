@@ -13,6 +13,8 @@
 --
 -- cron.schedule replaces a job of the same name, so re-running this file does
 -- not stack a second one.
+--
+-- 039 moved both again, to 18:07 UTC and every six hours, and runs after this file.
 
 select cron.schedule('catalog-near-duplicates-refresh', '7 13 * * *', $$select public.catalog_near_duplicates_refresh()$$);
 select cron.schedule('catalog-stats-refresh', '2 * * * *', $$select public.catalog_stats_refresh()$$);

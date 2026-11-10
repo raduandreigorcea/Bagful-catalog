@@ -4,7 +4,7 @@
 -- break: a re-import that quietly duplicates, an earned popularity that quietly
 -- resets, a fuzzy merge that quietly puts two products in one row.
 begin;
-select plan(42);
+select plan(46);
 
 delete from public.catalog_listings;
 delete from public.catalog_identifiers;
@@ -291,6 +291,51 @@ select public.catalog_import_listings($j$[
 ]$j$::jsonb, 'lidl');
 select is((select count(*)::int from public.catalog_products where brand = 'Izvorul Alb'), 2,
   'two different barcodes are two products');
+
+-- ─── an unchanged re-import writes no product (039) ─────────────────────────
+-- What the Disk IO budget was spent on: every listing seen rewrote its product,
+-- through a trigger that fired on the SET list and an update that filled blanks
+-- with nothing. A rewritten row moves, so its ctid is the witness; it is a
+-- clock-free one, which matters in a test that runs in one transaction.
+select public.catalog_import_listings($j$[
+  {"external_id":"BL1","name":"Paine alba feliata","price":3.5,"currency":"RON",
+   "product_url":"https://www.auchan.ro/p/bl1","available":true}
+]$j$::jsonb, 'auchan');
+create temp table product_ctids as select id, ctid::text as c from public.catalog_products;
+
+select public.catalog_import_listings($j$[
+  {"external_id":"BL1","name":"Paine alba feliata","price":3.5,"currency":"RON",
+   "product_url":"https://www.auchan.ro/p/bl1","available":true},
+  {"external_id":"A2","name":"Lapte Zuzu 1.5% 1L","brand":"Zuzu",
+   "price":8.49,"currency":"RON","quantity":1,"unit":"l","category":"dairy",
+   "product_url":"https://www.auchan.ro/p/a2","available":true}
+]$j$::jsonb, 'auchan');
+select is(
+  (select count(*)::int from public.catalog_products p join product_ctids b on b.id = p.id where p.ctid::text <> b.c),
+  0, 'an unchanged re-import rewrites no product, not even one with blanks');
+
+-- A blank the row CAN fill is still filled.
+select public.catalog_import_listings($j$[
+  {"external_id":"BL1","name":"Paine alba feliata","brand":"Vel Pitar","price":3.5,"currency":"RON",
+   "product_url":"https://www.auchan.ro/p/bl1","available":true}
+]$j$::jsonb, 'auchan');
+select is((select p.brand from public.catalog_products p join public.catalog_listings l on l.product_id = p.id
+            where l.external_id = 'BL1'), 'Vel Pitar', 'a brand arriving later fills the blank');
+
+-- A shop renaming its listing still reaches the search text, and only that
+-- product moves.
+truncate product_ctids;
+insert into product_ctids select id, ctid::text from public.catalog_products;
+select public.catalog_import_listings($j$[
+  {"external_id":"BL1","name":"Paine feliata toast","brand":"Vel Pitar","price":3.5,"currency":"RON",
+   "product_url":"https://www.auchan.ro/p/bl1","available":true}
+]$j$::jsonb, 'auchan');
+select ok((select p.search_blob like '%toast%' from public.catalog_products p
+            join public.catalog_listings l on l.product_id = p.id where l.external_id = 'BL1'),
+  'a renamed listing reaches the product''s search text');
+select is(
+  (select count(*)::int from public.catalog_products p join product_ctids b on b.id = p.id where p.ctid::text <> b.c),
+  1, 'and that product is the only one rewritten');
 
 -- ─── the retailer must exist ─────────────────────────────────────────────────
 select throws_ok(
